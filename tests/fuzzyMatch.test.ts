@@ -40,9 +40,9 @@ describe("referenceSimilarity", () => {
     expect(referenceSimilarity("UTR001A", "UTR-001A")).toBe(1);
   });
 
-  it("scores truncated UTR prefixes (≥6 chars) at least 0.9", () => {
+  it("scores truncated UTR prefixes (≥6 chars) at least 0.92", () => {
     expect(referenceSimilarity("UTRABC123456", "UTRABC123456XYZ")).toBeGreaterThanOrEqual(
-      0.9,
+      0.92,
     );
   });
 
@@ -52,7 +52,7 @@ describe("referenceSimilarity", () => {
   });
 
   it("does not boost non-prefix decoy-style UTR mangling to the prefix floor", () => {
-    // Non-prefix mangling stays on pure Levenshtein (~0.66) — must not get the 0.9 prefix boost
+    // Non-prefix mangling stays on pure Levenshtein (~0.66) — must not get the 0.92 prefix boost
     const sim = referenceSimilarity("UTRABCDEFGHJKLM", "UTRABCDEFGHXXXX");
     expect(sim).toBeGreaterThan(0.5);
     expect(sim).toBeLessThan(0.75);

@@ -24,7 +24,7 @@ export const KNOWN_LIMITATIONS = [
   "Ambiguous multi-solution batches are routed to the LLM/human tier (not auto-picked).",
   "No FX conversion — currency mismatches are never auto-resolved.",
   "Fuzzy matching uses net/credited amount, settlement/credit dates, and UTR similarity (prefix-aware).",
-  "Duplicate bank credits: first claim wins; extras become exceptions.",
+  "Duplicate bank credits: first claim (exact/fuzzy) wins; same-UTR leftovers are blocked before split and flagged as exceptions.",
   "Near-duplicate decoys and boundary UTR mangles are intentional hard cases for LLM/human tiers.",
   "Ollama LLM calls use temperature 0 and a fixed seed for reproducibility; Anthropic uses temperature 0.",
 ];

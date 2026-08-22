@@ -78,6 +78,47 @@ function reasonForLeftoverSettlement(settlementId: string): Exception {
   };
 }
 
+/** Settlement ids claimed by a match (primary + components). */
+export function settlementIdsOf(m: MatchResult): string[] {
+  return m.components ?? [m.settlementId];
+}
+
+/**
+ * Accept LLM matches in array order only when none of their settlements
+ * are already claimed by prior passes or an earlier accepted LLM match.
+ */
+export function mergeLlmMatches(
+  priorMatches: MatchResult[],
+  llmMatches: MatchResult[],
+): { accepted: MatchResult[]; exceptions: Exception[] } {
+  const claimed = new Set<string>();
+  for (const m of priorMatches) {
+    for (const id of settlementIdsOf(m)) claimed.add(id);
+  }
+
+  const accepted: MatchResult[] = [];
+  const exceptions: Exception[] = [];
+
+  for (const m of llmMatches) {
+    const ids = settlementIdsOf(m);
+    const conflicts = ids.filter((id) => claimed.has(id));
+    if (conflicts.length > 0) {
+      exceptions.push({
+        recordId: m.bankCreditId,
+        source: "bank",
+        reason:
+          "LLM-chosen combination conflicts with an already-claimed settlement",
+        relatedIds: conflicts,
+      });
+      continue;
+    }
+    for (const id of ids) claimed.add(id);
+    accepted.push(m);
+  }
+
+  return { accepted, exceptions };
+}
+
 /**
  * Orchestrates integrity → exact → fuzzy → split → LLM.
  */
@@ -138,9 +179,37 @@ export async function reconcile(
   );
   const fuzzyMs = performance.now() - t1;
 
+  // Duplicate bank credits: first claim (human/exact/fuzzy) wins — keep extras
+  // out of splitMatch so they cannot book a coincidental subset-sum.
+  const bankById = new Map(bankCredits.map((b) => [b.id, b]));
+  const claimedUtrToBankId = new Map<string, string>();
+  for (const m of [...humanMatches, ...pass1.matches, ...pass2.matches]) {
+    const bank = bankById.get(m.bankCreditId);
+    if (bank && !claimedUtrToBankId.has(bank.utr)) {
+      claimedUtrToBankId.set(bank.utr, bank.id);
+    }
+  }
+
+  const splitBankPool: BankCreditRecord[] = [];
+  const duplicateExceptions: Exception[] = [];
+  for (const bank of pass2.remainingBank) {
+    const winnerId = claimedUtrToBankId.get(bank.utr);
+    if (winnerId) {
+      duplicateExceptions.push({
+        recordId: bank.id,
+        source: "bank",
+        reason: `duplicate bank credit — UTR already settled by ${winnerId}`,
+        exceptionType: "duplicate_bank",
+        relatedIds: [winnerId],
+      });
+    } else {
+      splitBankPool.push(bank);
+    }
+  }
+
   const tSplit = performance.now();
   const passSplit = splitMatch(
-    pass2.remainingBank,
+    splitBankPool,
     pass2.remainingSettlements,
     cfg,
   );
@@ -158,13 +227,16 @@ export async function reconcile(
   );
   const llmMs = performance.now() - t2;
 
-  const matches: MatchResult[] = [
+  const priorMatches: MatchResult[] = [
     ...humanMatches,
     ...pass1.matches,
     ...pass2.matches,
     ...passSplit.matches,
-    ...pass3.matches,
   ];
+  const { accepted: llmAccepted, exceptions: llmConflictExceptions } =
+    mergeLlmMatches(priorMatches, pass3.matches);
+
+  const matches: MatchResult[] = [...priorMatches, ...llmAccepted];
 
   const matchedBank = new Set(matches.map((m) => m.bankCreditId));
   const matchedSettlement = new Set<string>();
@@ -198,8 +270,10 @@ export async function reconcile(
   const exceptions: Exception[] = [
     ...integrity.exceptions,
     ...pass2.exceptions,
+    ...duplicateExceptions,
     ...passSplit.exceptions,
     ...pass3.exceptions,
+    ...llmConflictExceptions,
     ...leftoverExceptions,
   ].filter(
     (e) =>
@@ -256,7 +330,7 @@ export async function reconcile(
   return {
     matches,
     exceptions: deduped,
-    ambiguousResolved: pass3.matches.length,
+    ambiguousResolved: llmAccepted.length,
     timing: {
       exactMs: Number(exactMs.toFixed(3)),
       fuzzyMs: Number(fuzzyMs.toFixed(3)),

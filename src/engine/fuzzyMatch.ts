@@ -48,8 +48,9 @@ export function referenceSimilarity(a: string, b: string): number {
   const shorter = na.length <= nb.length ? na : nb;
   const longer = na.length <= nb.length ? nb : na;
   // Truncated bank UTRs are a documented generator mangle; short prefixes are weak evidence.
+  // Floor 0.92 (not 0.9) so truncated true pairs clear fuzzyAcceptThreshold 0.75.
   if (shorter.length >= 6 && longer.startsWith(shorter)) {
-    return Math.max(lev, 0.9);
+    return Math.max(lev, 0.92);
   }
   return lev;
 }

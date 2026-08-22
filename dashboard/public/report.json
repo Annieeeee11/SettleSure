@@ -1,30 +1,30 @@
 {
   "metrics": {
-    "matchRate": 0.9130434782608695,
-    "precision": 0.9767441860465116,
-    "recall": 0.9130434782608695,
-    "falsePositiveRate": 0.023255813953488372,
-    "exceptionAccuracy": 0.75,
+    "matchRate": 1,
+    "precision": 1,
+    "recall": 1,
+    "falsePositiveRate": 0,
+    "exceptionAccuracy": 1,
     "trueMatchCount": 46,
-    "predictedMatchCount": 43,
-    "truePositive": 42,
-    "falsePositive": 1,
-    "falseNegative": 4,
+    "predictedMatchCount": 46,
+    "truePositive": 46,
+    "falsePositive": 0,
+    "falseNegative": 0,
     "trueExceptionCount": 30,
-    "predictedExceptionCount": 32,
-    "correctlyFlaggedExceptions": 24,
-    "throughputRecordsPerSec": 8512.36,
+    "predictedExceptionCount": 30,
+    "correctlyFlaggedExceptions": 30,
+    "throughputRecordsPerSec": 9228.07,
     "timing": {
-      "exactMs": 0.371,
-      "fuzzyMs": 12.036,
-      "splitMs": 0.709,
-      "llmMs": 0.352,
-      "totalMs": 14.802
+      "exactMs": 0.367,
+      "fuzzyMs": 10.817,
+      "splitMs": 0.643,
+      "llmMs": 0.309,
+      "totalMs": 13.654
     },
     "matchSourceBreakdown": {
       "exact": 22,
-      "fuzzy": 18,
-      "split": 3,
+      "fuzzy": 22,
+      "split": 2,
       "llm": 0,
       "human": 0
     },
@@ -37,33 +37,33 @@
     "byAmbiguityLevel": {
       "clear": {
         "matchRate": 1,
-        "precision": 0.9743589743589743,
+        "precision": 1,
         "recall": 1,
         "trueMatchCount": 38,
-        "predictedMatchCount": 39,
+        "predictedMatchCount": 38,
         "truePositive": 38,
-        "falsePositive": 1,
+        "falsePositive": 0,
         "notes": "trivial exact/fuzzy cases"
       },
       "boundary": {
-        "matchRate": 0.8,
+        "matchRate": 1,
         "precision": 1,
-        "recall": 0.8,
+        "recall": 1,
         "trueMatchCount": 5,
-        "predictedMatchCount": 4,
-        "truePositive": 4,
+        "predictedMatchCount": 5,
+        "truePositive": 5,
         "falsePositive": 0,
         "notes": "at fuzzy threshold edge"
       },
       "decoy": {
-        "matchRate": 0,
-        "precision": 0,
-        "recall": 0,
+        "matchRate": 1,
+        "precision": 1,
+        "recall": 1,
         "trueMatchCount": 3,
-        "predictedMatchCount": 1,
-        "truePositive": 0,
-        "falsePositive": 1,
-        "correctlyDeferred": 11,
+        "predictedMatchCount": 3,
+        "truePositive": 3,
+        "falsePositive": 0,
+        "correctlyDeferred": 16,
         "deferredTotal": 16,
         "notes": "correctly deferred, not auto-resolved to decoy"
       },
@@ -260,30 +260,30 @@
     {
       "bankCreditId": "bank_0035",
       "settlementId": "setl_0035",
-      "confidence": 0.97,
+      "confidence": 0.976,
       "matchedBy": "fuzzy",
-      "reasoning": "UTR similarity 0.90"
+      "reasoning": "UTR similarity 0.92"
     },
     {
       "bankCreditId": "bank_0036",
       "settlementId": "setl_0036",
-      "confidence": 0.97,
+      "confidence": 0.976,
       "matchedBy": "fuzzy",
-      "reasoning": "UTR similarity 0.90"
+      "reasoning": "UTR similarity 0.92"
     },
     {
       "bankCreditId": "bank_0037",
       "settlementId": "setl_0037",
-      "confidence": 0.97,
+      "confidence": 0.976,
       "matchedBy": "fuzzy",
-      "reasoning": "UTR similarity 0.90"
+      "reasoning": "UTR similarity 0.92"
     },
     {
       "bankCreditId": "bank_0038",
       "settlementId": "setl_0038",
-      "confidence": 0.97,
+      "confidence": 0.976,
       "matchedBy": "fuzzy",
-      "reasoning": "UTR similarity 0.90"
+      "reasoning": "UTR similarity 0.92"
     },
     {
       "bankCreditId": "bank_0027",
@@ -363,6 +363,34 @@
       "reasoning": "date off by 3d"
     },
     {
+      "bankCreditId": "bank_0039",
+      "settlementId": "setl_0039",
+      "confidence": 0.751,
+      "matchedBy": "fuzzy",
+      "reasoning": "date off by 3d; UTR similarity 0.92"
+    },
+    {
+      "bankCreditId": "bank_0040",
+      "settlementId": "setl_0040",
+      "confidence": 0.751,
+      "matchedBy": "fuzzy",
+      "reasoning": "date off by 3d; UTR similarity 0.92"
+    },
+    {
+      "bankCreditId": "bank_0041",
+      "settlementId": "setl_0042",
+      "confidence": 0.751,
+      "matchedBy": "fuzzy",
+      "reasoning": "date off by 3d; UTR similarity 0.92"
+    },
+    {
+      "bankCreditId": "bank_0042",
+      "settlementId": "setl_0044",
+      "confidence": 0.751,
+      "matchedBy": "fuzzy",
+      "reasoning": "date off by 3d; UTR similarity 0.92"
+    },
+    {
       "bankCreditId": "bank_0043",
       "settlementId": "setl_0046",
       "components": [
@@ -385,20 +413,6 @@
       "confidence": 1,
       "matchedBy": "split",
       "reasoning": "Unique subset-sum: setl_0049 + setl_0050 + setl_0051 = 798.84"
-    },
-    {
-      "bankCreditId": "bank_0057",
-      "settlementId": "setl_0041",
-      "components": [
-        "setl_0041",
-        "setl_0052",
-        "setl_0053",
-        "setl_0054",
-        "setl_0055"
-      ],
-      "confidence": 1,
-      "matchedBy": "split",
-      "reasoning": "Unique subset-sum: setl_0041 + setl_0052 + setl_0053 + setl_0054 + setl_0055 = 2837.24"
     }
   ],
   "exceptions": [
@@ -445,73 +459,21 @@
       "exceptionType": "currency_mismatch"
     },
     {
-      "recordId": "bank_0039",
+      "recordId": "bank_0055",
       "source": "bank",
-      "reason": "ambiguous — LLM unavailable",
+      "reason": "duplicate bank credit — UTR already settled by bank_0054",
+      "exceptionType": "duplicate_bank",
       "relatedIds": [
-        "setl_0039"
+        "bank_0054"
       ]
     },
     {
-      "recordId": "setl_0039",
-      "source": "settlement",
-      "reason": "ambiguous — LLM unavailable",
-      "relatedIds": [
-        "bank_0039"
-      ]
-    },
-    {
-      "recordId": "bank_0040",
+      "recordId": "bank_0057",
       "source": "bank",
-      "reason": "ambiguous — LLM unavailable",
+      "reason": "duplicate bank credit — UTR already settled by bank_0056",
+      "exceptionType": "duplicate_bank",
       "relatedIds": [
-        "setl_0040",
-        "setl_0041"
-      ]
-    },
-    {
-      "recordId": "setl_0040",
-      "source": "settlement",
-      "reason": "ambiguous — LLM unavailable",
-      "relatedIds": [
-        "bank_0040",
-        "setl_0041"
-      ]
-    },
-    {
-      "recordId": "bank_0041",
-      "source": "bank",
-      "reason": "ambiguous — LLM unavailable",
-      "relatedIds": [
-        "setl_0042",
-        "setl_0043"
-      ]
-    },
-    {
-      "recordId": "setl_0042",
-      "source": "settlement",
-      "reason": "ambiguous — LLM unavailable",
-      "relatedIds": [
-        "bank_0041",
-        "setl_0043"
-      ]
-    },
-    {
-      "recordId": "bank_0042",
-      "source": "bank",
-      "reason": "ambiguous — LLM unavailable",
-      "relatedIds": [
-        "setl_0044",
-        "setl_0045"
-      ]
-    },
-    {
-      "recordId": "setl_0044",
-      "source": "settlement",
-      "reason": "ambiguous — LLM unavailable",
-      "relatedIds": [
-        "bank_0042",
-        "setl_0045"
+        "bank_0056"
       ]
     },
     {
@@ -569,10 +531,10 @@
       "exceptionType": "unresolvable_noise"
     },
     {
-      "recordId": "bank_0055",
-      "source": "bank",
-      "reason": "UTR present in bank feed but no matching settlement (unclaimed credit)",
-      "exceptionType": "unclaimed_bank_credit"
+      "recordId": "setl_0041",
+      "source": "settlement",
+      "reason": "settlement present, bank credit missing (payout may be in transit)",
+      "exceptionType": "settlement_pending_bank"
     },
     {
       "recordId": "setl_0043",
@@ -582,6 +544,30 @@
     },
     {
       "recordId": "setl_0045",
+      "source": "settlement",
+      "reason": "settlement present, bank credit missing (payout may be in transit)",
+      "exceptionType": "settlement_pending_bank"
+    },
+    {
+      "recordId": "setl_0052",
+      "source": "settlement",
+      "reason": "settlement present, bank credit missing (payout may be in transit)",
+      "exceptionType": "settlement_pending_bank"
+    },
+    {
+      "recordId": "setl_0053",
+      "source": "settlement",
+      "reason": "settlement present, bank credit missing (payout may be in transit)",
+      "exceptionType": "settlement_pending_bank"
+    },
+    {
+      "recordId": "setl_0054",
+      "source": "settlement",
+      "reason": "settlement present, bank credit missing (payout may be in transit)",
+      "exceptionType": "settlement_pending_bank"
+    },
+    {
+      "recordId": "setl_0055",
       "source": "settlement",
       "reason": "settlement present, bank credit missing (payout may be in transit)",
       "exceptionType": "settlement_pending_bank"
@@ -634,7 +620,7 @@
     "Ambiguous multi-solution batches are routed to the LLM/human tier (not auto-picked).",
     "No FX conversion — currency mismatches are never auto-resolved.",
     "Fuzzy matching uses net/credited amount, settlement/credit dates, and UTR similarity (prefix-aware).",
-    "Duplicate bank credits: first claim wins; extras become exceptions.",
+    "Duplicate bank credits: first claim (exact/fuzzy) wins; same-UTR leftovers are blocked before split and flagged as exceptions.",
     "Near-duplicate decoys and boundary UTR mangles are intentional hard cases for LLM/human tiers.",
     "Ollama LLM calls use temperature 0 and a fixed seed for reproducibility; Anthropic uses temperature 0."
   ]
