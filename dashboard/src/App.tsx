@@ -218,7 +218,7 @@ export default function App() {
       <header className="hero">
         <p className="brand">
           <img
-            src="/logo.svg"
+            src="/favicon.svg"
             alt=""
             width={40}
             height={24}

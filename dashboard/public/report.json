@@ -13,13 +13,13 @@
     "trueExceptionCount": 30,
     "predictedExceptionCount": 30,
     "correctlyFlaggedExceptions": 30,
-    "throughputRecordsPerSec": 13371.54,
+    "throughputRecordsPerSec": 3950.46,
     "timing": {
-      "exactMs": 0.085,
-      "fuzzyMs": 8.802,
-      "splitMs": 0.113,
-      "llmMs": 0.057,
-      "totalMs": 9.423
+      "exactMs": 0.666,
+      "fuzzyMs": 26.817,
+      "splitMs": 1.092,
+      "llmMs": 0.573,
+      "totalMs": 31.895
     },
     "matchSourceBreakdown": {
       "exact": 22,
@@ -31,7 +31,7 @@
     "bankCount": 57,
     "settlementCount": 69,
     "paymentCount": 69,
-    "seed": 46,
+    "seed": 42,
     "llmEnabled": false,
     "llmProvider": "none",
     "byAmbiguityLevel": {
@@ -78,35 +78,6 @@
         "correctlyDeferred": 15,
         "deferredTotal": 15,
         "notes": "correctly flagged as exception"
-      }
-    },
-    "robustness": {
-      "seeds": [
-        42,
-        43,
-        44,
-        45,
-        46
-      ],
-      "matchRate": {
-        "mean": 1,
-        "min": 1,
-        "max": 1
-      },
-      "precision": {
-        "mean": 1,
-        "min": 1,
-        "max": 1
-      },
-      "recall": {
-        "mean": 1,
-        "min": 1,
-        "max": 1
-      },
-      "falsePositiveRate": {
-        "mean": 0,
-        "min": 0,
-        "max": 0
       }
     }
   },
@@ -315,78 +286,78 @@
       "reasoning": "UTR similarity 0.92"
     },
     {
-      "bankCreditId": "bank_0022",
-      "settlementId": "setl_0022",
-      "confidence": 0.925,
-      "matchedBy": "fuzzy",
-      "reasoning": "date off by 1d"
-    },
-    {
-      "bankCreditId": "bank_0023",
-      "settlementId": "setl_0023",
-      "confidence": 0.925,
-      "matchedBy": "fuzzy",
-      "reasoning": "date off by 1d"
-    },
-    {
-      "bankCreditId": "bank_0025",
-      "settlementId": "setl_0025",
-      "confidence": 0.925,
-      "matchedBy": "fuzzy",
-      "reasoning": "date off by 1d"
-    },
-    {
-      "bankCreditId": "bank_0026",
-      "settlementId": "setl_0026",
-      "confidence": 0.925,
-      "matchedBy": "fuzzy",
-      "reasoning": "date off by 1d"
-    },
-    {
-      "bankCreditId": "bank_0028",
-      "settlementId": "setl_0028",
-      "confidence": 0.9004,
-      "matchedBy": "fuzzy",
-      "reasoning": "amount delta within tolerance (score 0.75)"
-    },
-    {
       "bankCreditId": "bank_0027",
       "settlementId": "setl_0027",
-      "confidence": 0.8986,
-      "matchedBy": "fuzzy",
-      "reasoning": "amount delta within tolerance (score 0.75)"
-    },
-    {
-      "bankCreditId": "bank_0030",
-      "settlementId": "setl_0030",
-      "confidence": 0.8981,
+      "confidence": 0.8992,
       "matchedBy": "fuzzy",
       "reasoning": "amount delta within tolerance (score 0.75)"
     },
     {
       "bankCreditId": "bank_0029",
       "settlementId": "setl_0029",
-      "confidence": 0.8979,
+      "confidence": 0.8981,
+      "matchedBy": "fuzzy",
+      "reasoning": "amount delta within tolerance (score 0.75)"
+    },
+    {
+      "bankCreditId": "bank_0030",
+      "settlementId": "setl_0030",
+      "confidence": 0.8968,
       "matchedBy": "fuzzy",
       "reasoning": "amount delta within tolerance (score 0.74)"
     },
     {
       "bankCreditId": "bank_0031",
       "settlementId": "setl_0031",
-      "confidence": 0.896,
+      "confidence": 0.8951,
       "matchedBy": "fuzzy",
       "reasoning": "amount delta within tolerance (score 0.74)"
     },
     {
+      "bankCreditId": "bank_0028",
+      "settlementId": "setl_0028",
+      "confidence": 0.89,
+      "matchedBy": "fuzzy",
+      "reasoning": "amount delta within tolerance (score 0.72)"
+    },
+    {
       "bankCreditId": "bank_0021",
       "settlementId": "setl_0021",
+      "confidence": 0.85,
+      "matchedBy": "fuzzy",
+      "reasoning": "date off by 2d"
+    },
+    {
+      "bankCreditId": "bank_0023",
+      "settlementId": "setl_0023",
+      "confidence": 0.85,
+      "matchedBy": "fuzzy",
+      "reasoning": "date off by 2d"
+    },
+    {
+      "bankCreditId": "bank_0024",
+      "settlementId": "setl_0024",
+      "confidence": 0.85,
+      "matchedBy": "fuzzy",
+      "reasoning": "date off by 2d"
+    },
+    {
+      "bankCreditId": "bank_0026",
+      "settlementId": "setl_0026",
+      "confidence": 0.85,
+      "matchedBy": "fuzzy",
+      "reasoning": "date off by 2d"
+    },
+    {
+      "bankCreditId": "bank_0022",
+      "settlementId": "setl_0022",
       "confidence": 0.775,
       "matchedBy": "fuzzy",
       "reasoning": "date off by 3d"
     },
     {
-      "bankCreditId": "bank_0024",
-      "settlementId": "setl_0024",
+      "bankCreditId": "bank_0025",
+      "settlementId": "setl_0025",
       "confidence": 0.775,
       "matchedBy": "fuzzy",
       "reasoning": "date off by 3d"
@@ -429,7 +400,7 @@
       ],
       "confidence": 1,
       "matchedBy": "split",
-      "reasoning": "Unique subset-sum: setl_0046 + setl_0047 + setl_0048 = 806.97"
+      "reasoning": "Unique subset-sum: setl_0046 + setl_0047 + setl_0048 = 764.73"
     },
     {
       "bankCreditId": "bank_0044",
@@ -441,26 +412,26 @@
       ],
       "confidence": 1,
       "matchedBy": "split",
-      "reasoning": "Unique subset-sum: setl_0049 + setl_0050 + setl_0051 = 775.86"
+      "reasoning": "Unique subset-sum: setl_0049 + setl_0050 + setl_0051 = 798.84"
     }
   ],
   "exceptions": [
     {
       "recordId": "setl_0060",
       "source": "settlement",
-      "reason": "fee/tax miscalculation: netAmount 2526.48 ≠ gross(2572.72) - fee(61.16) - tax(11.01) = 2500.55",
+      "reason": "fee/tax miscalculation: netAmount 955.72 ≠ gross(928.21) - fee(19.77) - tax(3.56) = 904.88",
       "exceptionType": "fee_tax_mismatch"
     },
     {
       "recordId": "setl_0061",
       "source": "settlement",
-      "reason": "fee/tax miscalculation: netAmount 199.81 ≠ gross(189.02) - fee(3.69) - tax(0.66) = 184.67",
+      "reason": "fee/tax miscalculation: netAmount 143.66 ≠ gross(100.71) - fee(1.57) - tax(0.28) = 98.86",
       "exceptionType": "fee_tax_mismatch"
     },
     {
       "recordId": "setl_0062",
       "source": "settlement",
-      "reason": "fee/tax miscalculation: netAmount 4893.56 ≠ gross(4986.84) - fee(96.86) - tax(17.43) = 4872.55",
+      "reason": "fee/tax miscalculation: netAmount 146.14 ≠ gross(108.06) - fee(1.67) - tax(0.3) = 106.09",
       "exceptionType": "fee_tax_mismatch"
     },
     {
