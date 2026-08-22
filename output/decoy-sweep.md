@@ -1,7 +1,7 @@
 # Near-duplicate decoy offset sweep
 
-Seed **42**, `--skip-llm`. Varies only decoy amount delta and date offset;
-true settlement stays **+3d**. Default cell is **±1.2% / +2d**.
+Seed **42**, `--skip-llm`. Varies decoy amount delta and date offset;
+true settlement defaults to **+3d**. Default decoy cell is **±1.2% / +2d**.
 
 | Amount Δ | Date offset (d) | Decoy deferral | FP rate | Precision | Recall |
 | ---: | ---: | ---: | ---: | ---: | ---: |
@@ -21,5 +21,18 @@ true settlement stays **+3d**. Default cell is **±1.2% / +2d**.
 | ±2.0% | 2 | 16/16 | 0.00% | 100.00% | 100.00% |
 | ±2.0% | 3 | 16/16 | 0.00% | 100.00% | 100.00% |
 
-Closer decoys (e.g. ±0.5% or +1d) can clear the 0.75 fuzzy accept threshold
-and escalate to LLM/human — that is the intended path, not a silent failure.
+### True-settlement date offset (default decoy ±1.2% / +2d)
+
+The 0.751 accept margin also rests on the true pair’s **+3d** date offset;
++4d would put true pairs at ~0.676 → FN.
+
+| True date offset (d) | Decoy deferral | FP rate | Precision | Recall |
+| ---: | ---: | ---: | ---: | ---: |
+| 3 | 16/16 | 0.00% | 100.00% | 100.00% |
+| 4 | 16/16 | 0.00% | 100.00% | 93.48% |
+| 5 | 16/16 | 0.00% | 100.00% | 93.48% |
+
+Closer decoys clear the 0.75 threshold — with the LLM tier enabled they land
+in the ambiguous band for LLM/human review; skip-llm they score as FPs (see grid).
+The ±0.5%/+1d cell also drops recall to **93.48%** because the accepted decoy
+steals the bank credit from the true pair.

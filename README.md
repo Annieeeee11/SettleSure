@@ -20,7 +20,7 @@ This is a Razorpay-style 3-way settlement reconciliation: Payments → Settlemen
 3. In the dashboard, click **Accept** on one ambiguous exception, then **Re-run with corrections**. The human-resolved count should move from 0 to 1+ in the match-source chart.
 4. `npm run reconcile -- --seed 42 --compare-llm --llm-provider ollama --llm-model llama3.2` shows residual LLM work on ambiguous splits (often `unsure` / 0–2 matches), side by side with skip-llm already at 100% (needs local Ollama).
 
-<img width="575" height="578" alt="image" src="https://github.com/user-attachments/assets/0aa1b20d-48ce-4e48-ab98-ea39dfa0c4d2" />
+<img width="575" height="700" alt="SettleSure dashboard seed 42" src="docs/dashboard-seed42.png" />
 
 
 ---
@@ -31,7 +31,7 @@ This is a Razorpay-style 3-way settlement reconciliation: Payments → Settlemen
 | ---: | ---: | ---: | ---: |
 | 100.00% | 100.00% | 0.00% | 22 / 22 / 2 / 0 / 0 |
 
-**LLM ablation** (`npm run reconcile -- --seed 42 --compare-llm --llm-provider ollama --llm-model llama3.2`, actual run):
+**LLM ablation** (`npm run reconcile -- --seed 42 --compare-llm --llm-provider ollama --llm-model qwen2.5-coder:7b`, measured run):
 
 | | With LLM | Without LLM |
 | --- | ---: | ---: |
@@ -39,9 +39,9 @@ This is a Razorpay-style 3-way settlement reconciliation: Payments → Settlemen
 | Precision | 100.00% | 100.00% |
 | FP rate | 0.00% | 0.00% |
 | LLM matches | 0 | 0 |
-| Provider | none† | none |
+| Provider | ollama (qwen2.5-coder:7b) | none |
 
-† Ollama requested but `localhost:11434` unreachable — with-LLM fell back to provider `none` (same deterministic path as Without). Re-run locally when Ollama is up to measure residual ambiguous-split behaviour.
+2 LLM calls, both ambiguous splits honestly `unsure` — the tier fires and refuses to guess.
 
 ### Calibration margin
 
@@ -49,7 +49,7 @@ Fuzzy weights: amount **0.4** / date **0.3** / reference **0.3** (`src/engine/co
 
 - Truncated true pair: amount=1, date=+3d → `dateScore = 1 - 3/4 = 0.25`, ref=0.92 → composite **0.4 + 0.075 + 0.276 = 0.751** (clears accept).
 - Default decoy (`near_duplicate_decoy`): amount **±1.2%**, date **+2d**, weaker UTR → composite ~**0.586** (stays below 0.75).
-- Closer decoys (e.g. +1d or ~0.5% amount) can clear 0.75 and escalate to LLM/human — that is the intended path, not a silent failure.
+- Closer decoys clear the 0.75 threshold — with the LLM tier enabled they land in the ambiguous band for LLM/human review; skip-llm they score as FPs (see grid). The ±0.5%/+1d cell also drops recall to **93.48%** because the accepted decoy steals the bank credit from the true pair.
 
 Full grid: [`output/decoy-sweep.md`](output/decoy-sweep.md) (`npm run sweep-decoys`).
 
@@ -135,7 +135,7 @@ npm run check-baseline
 - No FX conversion
 - Seed 42 skip-llm clears boundary via prefix-aware UTR floor 0.92; decoy deferral 16/16 at default ±1.2%/+2d. Residual LLM work is mainly ambiguous splits / unsure cases
 - Duplicate bank credits: first claim (exact/fuzzy/split-pool enqueue) wins; same-UTR leftovers are blocked before split and flagged `duplicate_bank` (prevents coincidental subset-sum FPs)
-- Latest `--compare-llm` against Ollama fell back to provider `none` (localhost:11434 unreachable); table in README records that measured fallback. Prior Ollama run (before guards) lifted recall 91.30% → 95.65% on leftover fuzzy pairs — historical only
+- Measured `--compare-llm` with Ollama `qwen2.5-coder:7b`: 2 LLM calls on the ambiguous splits, both `unsure` (tier fires, refuses to guess); metrics stay 100/100/0. Prior Ollama run (before guards) lifted recall 91.30% → 95.65% on leftover fuzzy pairs — historical only
 - Ollama LLM calls fix `temperature: 0` and pass the reconcile seed; Anthropic uses `temperature: 0`. Remaining variance is model/runtime behaviour, not unset sampling knobs
 - Exception rows in the terminal/markdown report are grouped by `relatedIds` for display; `report.json` keeps per-record flags so scoring is unchanged
 - Calibration margin and decoy-offset grid: see README Calibration margin and `output/decoy-sweep.md`

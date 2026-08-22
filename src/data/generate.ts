@@ -143,8 +143,10 @@ export interface GeneratedDataset {
 export interface GenerateDatasetOpts {
   /** Decoy settlement amount offset vs true net (default 0.012 = ±1.2%). */
   decoyAmountDeltaPct?: number;
-  /** Decoy settlement date offset in days (default 2; true settlement stays +3). */
+  /** Decoy settlement date offset in days (default 2). */
   decoyDateOffsetDays?: number;
+  /** True near-dup settlement date offset in days (default 3). */
+  trueDateOffsetDays?: number;
 }
 
 export function generateDataset(
@@ -153,6 +155,7 @@ export function generateDataset(
 ): GeneratedDataset {
   const decoyAmountDeltaPct = opts.decoyAmountDeltaPct ?? 0.012;
   const decoyDateOffsetDays = opts.decoyDateOffsetDays ?? 2;
+  const trueDateOffsetDays = opts.trueDateOffsetDays ?? 3;
   const rng = createRng(seed);
   const payments: PaymentRecord[] = [];
   const settlements: SettlementRecord[] = [];
@@ -401,7 +404,7 @@ export function generateDataset(
           const trueId = nextSettlementId();
           const decoyId = nextSettlementId();
           const bankId = nextBankId();
-          // True: +3d + truncated UTR floor 0.92 → composite ~0.751 (accepts).
+          // True: +trueDateOffsetDays (default +3) + truncated UTR floor 0.92 → composite ~0.751.
           // Decoy: ±decoyAmountDeltaPct + decoyDateOffsetDays + weaker UTR (stays below 0.75 at defaults).
           const trueUtr = mangleUtrToSimilarity(utr, 0.68, rng);
           const decoyUtr = mangleUtrToSimilarity(utr, 0.66, rng);
@@ -421,7 +424,7 @@ export function generateDataset(
             fee,
             tax,
             netAmount: net,
-            settledAt: addDays(date, 3),
+            settledAt: addDays(date, trueDateOffsetDays),
             utr: trueUtr,
             currency,
           });

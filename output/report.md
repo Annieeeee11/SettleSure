@@ -2,7 +2,7 @@
 
 Razorpay-style 3-way flow: **Payment → Settlement → Bank payout credit** (UTR join).
 
-Seed: `42` · Payments: 69 · Settlements: 69 · Bank credits: 57
+Seed: `46` · Payments: 69 · Settlements: 69 · Bank credits: 57
 LLM pass: disabled / unavailable
 
 ## Headline metrics
@@ -14,8 +14,8 @@ LLM pass: disabled / unavailable
 | Recall | 100.00% |
 | False positive rate | 0.00% |
 | Exception accuracy | 100.00% |
-| Throughput | 7389.16 records/sec |
-| Runtime (total) | 17.05 ms |
+| Throughput | 13371.54 records/sec |
+| Runtime (total) | 9.42 ms |
 
 ### Counts
 
@@ -40,11 +40,11 @@ LLM pass: disabled / unavailable
 
 | Pass timing | ms |
 | --- | ---: |
-| Exact | 0.41 |
-| Fuzzy | 11.40 |
-| Split | 0.61 |
-| LLM | 0.38 |
-| Total | 17.05 |
+| Exact | 0.09 |
+| Fuzzy | 8.80 |
+| Split | 0.11 |
+| LLM | 0.06 |
+| Total | 9.42 |
 
 ## Accuracy by case difficulty
 
@@ -55,13 +55,24 @@ LLM pass: disabled / unavailable
 | Decoy | 100.00% | 100.00% | 100.00% | correctly deferred, not auto-resolved to decoy |
 | Unresolvable | — | — | 100.00% | correctly flagged as exception |
 
+## Robustness across seeds
+
+Seeds: 42, 43, 44, 45, 46
+
+| Metric | Mean | Min | Max |
+| --- | ---: | ---: | ---: |
+| Match rate | 100.00% | 100.00% | 100.00% |
+| Precision | 100.00% | 100.00% | 100.00% |
+| Recall | 100.00% | 100.00% | 100.00% |
+| FP rate | 0.00% | 0.00% | 0.00% |
+
 ## Exception list
 
 | Record ID(s) | Source | Reason |
 | --- | --- | --- |
-| setl_0060 | settlement | fee/tax miscalculation: netAmount 955.72 ≠ gross(928.21) - fee(19.77) - tax(3.56) = 904.88 |
-| setl_0061 | settlement | fee/tax miscalculation: netAmount 143.66 ≠ gross(100.71) - fee(1.57) - tax(0.28) = 98.86 |
-| setl_0062 | settlement | fee/tax miscalculation: netAmount 146.14 ≠ gross(108.06) - fee(1.67) - tax(0.3) = 106.09 |
+| setl_0060 | settlement | fee/tax miscalculation: netAmount 2526.48 ≠ gross(2572.72) - fee(61.16) - tax(11.01) = 2500.55 |
+| setl_0061 | settlement | fee/tax miscalculation: netAmount 199.81 ≠ gross(189.02) - fee(3.69) - tax(0.66) = 184.67 |
+| setl_0062 | settlement | fee/tax miscalculation: netAmount 4893.56 ≠ gross(4986.84) - fee(96.86) - tax(17.43) = 4872.55 |
 | bank_0049 | bank | currency mismatch, not auto-resolved |
 | bank_0050 | bank | currency mismatch, not auto-resolved |
 | setl_0066 | settlement | currency mismatch, not auto-resolved |
