@@ -3,6 +3,7 @@ data/*
 output/*
 !output/.gitkeep
 !output/report.md
+!output/decoy-sweep.md
 node_modules/
 dashboard/node_modules/
 dist/

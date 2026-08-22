@@ -13,13 +13,13 @@
     "trueExceptionCount": 30,
     "predictedExceptionCount": 30,
     "correctlyFlaggedExceptions": 30,
-    "throughputRecordsPerSec": 9228.07,
+    "throughputRecordsPerSec": 7389.16,
     "timing": {
-      "exactMs": 0.367,
-      "fuzzyMs": 10.817,
-      "splitMs": 0.643,
-      "llmMs": 0.309,
-      "totalMs": 13.654
+      "exactMs": 0.408,
+      "fuzzyMs": 11.397,
+      "splitMs": 0.607,
+      "llmMs": 0.375,
+      "totalMs": 17.052
     },
     "matchSourceBreakdown": {
       "exact": 22,
@@ -620,7 +620,7 @@
     "Ambiguous multi-solution batches are routed to the LLM/human tier (not auto-picked).",
     "No FX conversion — currency mismatches are never auto-resolved.",
     "Fuzzy matching uses net/credited amount, settlement/credit dates, and UTR similarity (prefix-aware).",
-    "Duplicate bank credits: first claim (exact/fuzzy) wins; same-UTR leftovers are blocked before split and flagged as exceptions.",
+    "Duplicate bank credits: first claim (exact/fuzzy/split-pool enqueue) wins; same-UTR leftovers are blocked before split and flagged as exceptions.",
     "Near-duplicate decoys and boundary UTR mangles are intentional hard cases for LLM/human tiers.",
     "Ollama LLM calls use temperature 0 and a fixed seed for reproducibility; Anthropic uses temperature 0."
   ]

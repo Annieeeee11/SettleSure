@@ -9,7 +9,8 @@
     "generate": "tsx src/cli.ts --generate-only",
     "test": "vitest run",
     "dashboard": "npm run dev --prefix dashboard",
-    "check-baseline": "node scripts/check-baseline.mjs"
+    "check-baseline": "node scripts/check-baseline.mjs",
+    "sweep-decoys": "tsx scripts/sweep-decoys.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0"
