@@ -203,6 +203,8 @@ export async function reconcile(
         relatedIds: [winnerId],
       });
     } else {
+      // Reserve UTR on enqueue so two same-UTR leftovers cannot both enter split.
+      claimedUtrToBankId.set(bank.utr, bank.id);
       splitBankPool.push(bank);
     }
   }

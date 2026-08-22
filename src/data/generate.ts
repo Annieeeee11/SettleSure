@@ -139,7 +139,20 @@ export interface GeneratedDataset {
   seed: number;
 }
 
-export function generateDataset(seed = 42): GeneratedDataset {
+/** Optional generator knobs; defaults preserve seed-42 reproducibility. */
+export interface GenerateDatasetOpts {
+  /** Decoy settlement amount offset vs true net (default 0.012 = ±1.2%). */
+  decoyAmountDeltaPct?: number;
+  /** Decoy settlement date offset in days (default 2; true settlement stays +3). */
+  decoyDateOffsetDays?: number;
+}
+
+export function generateDataset(
+  seed = 42,
+  opts: GenerateDatasetOpts = {},
+): GeneratedDataset {
+  const decoyAmountDeltaPct = opts.decoyAmountDeltaPct ?? 0.012;
+  const decoyDateOffsetDays = opts.decoyDateOffsetDays ?? 2;
   const rng = createRng(seed);
   const payments: PaymentRecord[] = [];
   const settlements: SettlementRecord[] = [];
@@ -197,7 +210,6 @@ export function generateDataset(seed = 42): GeneratedDataset {
   }
 
   let boundaryAboveLeft = 4;
-  let nearDupForDemo = 0;
 
   for (const { cls, count, level } of classPlan) {
     for (let i = 0; i < count; i++) {
@@ -389,10 +401,15 @@ export function generateDataset(seed = 42): GeneratedDataset {
           const trueId = nextSettlementId();
           const decoyId = nextSettlementId();
           const bankId = nextBankId();
-          // +3d and ref~0.68 → composite ~0.68 (ambiguous band for LLM)
+          // True: +3d + truncated UTR floor 0.92 → composite ~0.751 (accepts).
+          // Decoy: ±decoyAmountDeltaPct + decoyDateOffsetDays + weaker UTR (stays below 0.75 at defaults).
           const trueUtr = mangleUtrToSimilarity(utr, 0.68, rng);
           const decoyUtr = mangleUtrToSimilarity(utr, 0.66, rng);
-          const decoyNet = roundMoney(net * (1 + (rng() < 0.5 ? -0.012 : 0.012)));
+          const decoyNet = roundMoney(
+            net *
+              (1 +
+                (rng() < 0.5 ? -decoyAmountDeltaPct : decoyAmountDeltaPct)),
+          );
           const decoyFee = roundMoney(decoyNet * 0.02);
           const decoyTax = roundMoney(decoyFee * 0.18);
           const decoyGross = roundMoney(decoyNet + decoyFee + decoyTax);
@@ -415,7 +432,7 @@ export function generateDataset(seed = 42): GeneratedDataset {
             fee: decoyFee,
             tax: decoyTax,
             netAmount: decoyNet,
-            settledAt: addDays(date, 2),
+            settledAt: addDays(date, decoyDateOffsetDays),
             utr: decoyUtr,
             currency,
           });
@@ -444,17 +461,6 @@ export function generateDataset(seed = 42): GeneratedDataset {
             class: cls,
             ambiguityLevel: level,
           });
-          if (nearDupForDemo < 2) {
-            demoCorrections.push({
-              recordId: bankId,
-              source: "bank",
-              decision: "accept",
-              correctedMatchId: trueId,
-              score: 0.7,
-              ts: new Date().toISOString(),
-            });
-            nearDupForDemo++;
-          }
           break;
         }
         case "duplicate_bank": {
@@ -720,6 +726,18 @@ export function generateDataset(seed = 42): GeneratedDataset {
               ambiguityLevel: level,
             });
           }
+          // Human-loop demo: accept first dual-sum pair (100+200), not near-dups.
+          // GT labels these banks as exceptions — accepting scores as FP by design.
+          const pair = [ids[0]!, ids[1]!];
+          demoCorrections.push({
+            recordId: bankId,
+            source: "bank",
+            decision: "accept",
+            correctedMatchId: pair[0],
+            components: pair,
+            score: 0.7,
+            ts: new Date().toISOString(),
+          });
           break;
         }
         case "unresolvable_noise": {

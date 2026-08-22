@@ -11,14 +11,14 @@
 ![LLM agent](https://img.shields.io/badge/llm--agent-111827?style=flat&logo=openai&logoColor=white)
 ![Ollama](https://img.shields.io/badge/Ollama-000000?style=flat&logo=ollama&logoColor=white)
 
-This is a Razorpay-style 3-way settlement reconciliation: Payments → Settlements (gross/fee/tax/net + UTR) → Bank payout credits. Exact, fuzzy, and split matching handle most of the batch. The harder leftover cases (near-duplicates and UTRs mangled right at the fuzzy boundary) go to the LLM or a human.
+This is a Razorpay-style 3-way settlement reconciliation: Payments → Settlements (gross/fee/tax/net + UTR) → Bank payout credits. The deterministic engine (exact → fuzzy → split) earns 100% on the hard seed-42 batch; LLM and human tiers escalate genuinely ambiguous multi-solution splits — not recall crutches.
 
 ## 60-second demo
 
 1. `npm install && npm run reconcile -- --seed 42 --skip-llm` generates the batch, runs exact → fuzzy → split, and prints the report.
 2. `npm run dashboard` opens http://localhost:5173. You’ll see match rate, precision, recall, and FP rate by case difficulty, plus the full exception list with reasons.
 3. In the dashboard, click **Accept** on one ambiguous exception, then **Re-run with corrections**. The human-resolved count should move from 0 to 1+ in the match-source chart.
-4. `npm run reconcile -- --seed 42 --compare-llm --llm-provider ollama --llm-model llama3.2` shows what the LLM pass actually does to recall, side by side with LLM off (needs local Ollama).
+4. `npm run reconcile -- --seed 42 --compare-llm --llm-provider ollama --llm-model llama3.2` shows residual LLM work on ambiguous splits (often `unsure` / 0–2 matches), side by side with skip-llm already at 100% (needs local Ollama).
 
 <img width="575" height="578" alt="image" src="https://github.com/user-attachments/assets/0aa1b20d-48ce-4e48-ab98-ea39dfa0c4d2" />
 
@@ -35,17 +35,25 @@ This is a Razorpay-style 3-way settlement reconciliation: Payments → Settlemen
 
 | | With LLM | Without LLM |
 | --- | ---: | ---: |
-| Match rate / Recall | — | 100.00% |
-| Precision | — | 100.00% |
-| FP rate | — | 0.00% |
-| LLM matches | — | 0 |
-| Provider | ollama | none |
+| Match rate / Recall | 100.00% | 100.00% |
+| Precision | 100.00% | 100.00% |
+| FP rate | 0.00% | 0.00% |
+| LLM matches | 0 | 0 |
+| Provider | none† | none |
 
-Without-LLM is re-measured after the duplicate-UTR guard and prefix-floor 0.92 (match/precision/recall 100%, FP 0%). With-LLM column left blank pending a local Ollama `--compare-llm` re-run (prior residual fuzzy pairs are now resolved deterministically).
+† Ollama requested but `localhost:11434` unreachable — with-LLM fell back to provider `none` (same deterministic path as Without). Re-run locally when Ollama is up to measure residual ambiguous-split behaviour.
 
-Skip-llm on seed 42 is now **100% match / 100% precision / 100% recall / 0% FP** after the duplicate-UTR split guard and raising the truncated-UTR prefix floor to **0.92** (so truncated true pairs clear the 0.75 fuzzy accept threshold). Residual LLM work is mainly ambiguous multi-solution splits. Prior Ollama `llama3.2` ablation (before these guards) lifted recall from 91.30% → 95.65% on 2 of 4 leftover fuzzy pairs; re-run `--compare-llm` locally to refresh that table. Ollama uses `temperature: 0` and the reconcile `--seed`; Anthropic uses `temperature: 0`.
+### Calibration margin
 
-**Human loop:** Accept in the dashboard writes `output/corrections.json`. **Re-run with corrections** (or `npm run reconcile -- --seed 42 --skip-llm --apply-corrections`) brings recall to **95.65%** with **Human: 2** in the match-source chart. That run used `data/demo_corrections.json` when no corrections file existed yet.
+Fuzzy weights: amount **0.4** / date **0.3** / reference **0.3** (`src/engine/config.ts`); accept threshold **0.75**; truncated-UTR prefix floor **0.92**.
+
+- Truncated true pair: amount=1, date=+3d → `dateScore = 1 - 3/4 = 0.25`, ref=0.92 → composite **0.4 + 0.075 + 0.276 = 0.751** (clears accept).
+- Default decoy (`near_duplicate_decoy`): amount **±1.2%**, date **+2d**, weaker UTR → composite ~**0.586** (stays below 0.75).
+- Closer decoys (e.g. +1d or ~0.5% amount) can clear 0.75 and escalate to LLM/human — that is the intended path, not a silent failure.
+
+Full grid: [`output/decoy-sweep.md`](output/decoy-sweep.md) (`npm run sweep-decoys`).
+
+**Human loop:** Skip-llm is already at 100% recall; the human tier is for **ambiguous splits** the engine correctly refuses and LLM marks `unsure`. `npm run reconcile -- --seed 42 --skip-llm --apply-corrections` (or dashboard Accept → Re-run) shows **Human ≥ 1** in match sources via `data/demo_corrections.json`. Accepting a GT-`exception` row (ambiguous split) scores as an **FP by design** — GT says “do not auto-match”; the human override is still a useful ops demo.
 
 ```bash
 npm install
@@ -125,11 +133,12 @@ npm run check-baseline
 - Split matching is bounded (pool ≤25, combo ≤6)
 - Ambiguous multi-solution batches are not auto-picked; they are routed to the LLM/human tier with the tied combinations listed
 - No FX conversion
-- Seed 42 skip-llm now clears boundary via prefix-aware UTR floor 0.92; decoy deferral 16/16. Residual LLM work is mainly ambiguous splits / unsure cases
-- Duplicate bank credits: first claim (exact/fuzzy) wins; same-UTR leftovers are blocked before split and flagged `duplicate_bank` (prevents coincidental subset-sum FPs)
-- On the prior Ollama `llama3.2` ablation run (seed 42), the model correctly matched 2 of 4 residual true pairs (`bank_0039`/`setl_0039`, `bank_0042`/`setl_0044`) using amount + UTR signals, but wrongly rejected the other two true near dup pairs (`bank_0040`/`setl_0040`, `bank_0041`/`setl_0042`) as `no_match` because truncated UTRs weren’t treated as prefixes. The engine now instructs the model to judge on shared prefixes and includes rival candidates; re-measure with local Ollama to update the ablation table
+- Seed 42 skip-llm clears boundary via prefix-aware UTR floor 0.92; decoy deferral 16/16 at default ±1.2%/+2d. Residual LLM work is mainly ambiguous splits / unsure cases
+- Duplicate bank credits: first claim (exact/fuzzy/split-pool enqueue) wins; same-UTR leftovers are blocked before split and flagged `duplicate_bank` (prevents coincidental subset-sum FPs)
+- Latest `--compare-llm` against Ollama fell back to provider `none` (localhost:11434 unreachable); table in README records that measured fallback. Prior Ollama run (before guards) lifted recall 91.30% → 95.65% on leftover fuzzy pairs — historical only
 - Ollama LLM calls fix `temperature: 0` and pass the reconcile seed; Anthropic uses `temperature: 0`. Remaining variance is model/runtime behaviour, not unset sampling knobs
 - Exception rows in the terminal/markdown report are grouped by `relatedIds` for display; `report.json` keeps per-record flags so scoring is unchanged
+- Calibration margin and decoy-offset grid: see README Calibration margin and `output/decoy-sweep.md`
 
 ## What broke, and what we did about it
 

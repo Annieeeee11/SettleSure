@@ -66,4 +66,104 @@ describe("reconcile e2e (seed 42, skip-llm)", () => {
     expect(ex?.source).toBe("bank");
     expect(ex?.reason).toMatch(/duplicate bank credit/i);
   });
+
+  it("reserves UTR on split-pool enqueue so same-UTR leftovers cannot both match", async () => {
+    const date = "2025-01-15";
+    const payments = [
+      {
+        orderId: "order_1",
+        paymentId: "pay_1",
+        amount: 102.36,
+        currency: "INR",
+        status: "captured" as const,
+        createdAt: date,
+      },
+      {
+        orderId: "order_2",
+        paymentId: "pay_2",
+        amount: 51.18,
+        currency: "INR",
+        status: "captured" as const,
+        createdAt: date,
+      },
+      {
+        orderId: "order_3",
+        paymentId: "pay_3",
+        amount: 51.18,
+        currency: "INR",
+        status: "captured" as const,
+        createdAt: date,
+      },
+    ];
+    const settlements = [
+      {
+        settlementId: "setl_1",
+        paymentId: "pay_1",
+        grossAmount: 102.36,
+        fee: 2,
+        tax: 0.36,
+        netAmount: 100,
+        settledAt: date,
+        utr: "SETL_UTR_AAAA",
+        currency: "INR",
+      },
+      {
+        settlementId: "setl_2",
+        paymentId: "pay_2",
+        grossAmount: 51.18,
+        fee: 1,
+        tax: 0.18,
+        netAmount: 50,
+        settledAt: date,
+        utr: "SETL_UTR_BBBB",
+        currency: "INR",
+      },
+      {
+        settlementId: "setl_3",
+        paymentId: "pay_3",
+        grossAmount: 51.18,
+        fee: 1,
+        tax: 0.18,
+        netAmount: 50,
+        settledAt: date,
+        utr: "SETL_UTR_CCCC",
+        currency: "INR",
+      },
+    ];
+    // Same UTR, both survive exact/fuzzy (UTR ≠ settlements) into split pool.
+    const bankCredits = [
+      {
+        id: "bank_dup_a",
+        utr: "SHARED_UTR_999",
+        creditedAmount: 100,
+        creditedAt: date,
+        currency: "INR",
+      },
+      {
+        id: "bank_dup_b",
+        utr: "SHARED_UTR_999",
+        creditedAmount: 100,
+        creditedAt: date,
+        currency: "INR",
+      },
+    ];
+
+    const result = await reconcile(payments, settlements, bankCredits, {
+      skipLlm: true,
+      seed: 42,
+    });
+
+    const matchedDup = result.matches.filter((m) =>
+      m.bankCreditId.startsWith("bank_dup_"),
+    );
+    expect(matchedDup.length).toBeLessThanOrEqual(1);
+
+    const dupEx = result.exceptions.find(
+      (e) =>
+        e.exceptionType === "duplicate_bank" &&
+        e.recordId.startsWith("bank_dup_"),
+    );
+    expect(dupEx).toBeDefined();
+    expect(dupEx?.relatedIds?.[0]).toMatch(/^bank_dup_/);
+  });
 });

@@ -14,8 +14,8 @@ LLM pass: disabled / unavailable
 | Recall | 100.00% |
 | False positive rate | 0.00% |
 | Exception accuracy | 100.00% |
-| Throughput | 9228.07 records/sec |
-| Runtime (total) | 13.65 ms |
+| Throughput | 7389.16 records/sec |
+| Runtime (total) | 17.05 ms |
 
 ### Counts
 
@@ -40,11 +40,11 @@ LLM pass: disabled / unavailable
 
 | Pass timing | ms |
 | --- | ---: |
-| Exact | 0.37 |
-| Fuzzy | 10.82 |
-| Split | 0.64 |
-| LLM | 0.31 |
-| Total | 13.65 |
+| Exact | 0.41 |
+| Fuzzy | 11.40 |
+| Split | 0.61 |
+| LLM | 0.38 |
+| Total | 17.05 |
 
 ## Accuracy by case difficulty
 
@@ -90,6 +90,6 @@ _Grouped by relatedIds for display (22 groups from 30 per-record flags). Scoring
 - Ambiguous multi-solution batches are routed to the LLM/human tier (not auto-picked).
 - No FX conversion — currency mismatches are never auto-resolved.
 - Fuzzy matching uses net/credited amount, settlement/credit dates, and UTR similarity (prefix-aware).
-- Duplicate bank credits: first claim (exact/fuzzy) wins; same-UTR leftovers are blocked before split and flagged as exceptions.
+- Duplicate bank credits: first claim (exact/fuzzy/split-pool enqueue) wins; same-UTR leftovers are blocked before split and flagged as exceptions.
 - Near-duplicate decoys and boundary UTR mangles are intentional hard cases for LLM/human tiers.
 - Ollama LLM calls use temperature 0 and a fixed seed for reproducibility; Anthropic uses temperature 0.
