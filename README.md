@@ -30,27 +30,17 @@ This is a Razorpay-style 3-way settlement reconciliation: Payments → Settlemen
 
 | Precision | Recall | FP rate | Exact / Fuzzy / Split / LLM / Human |
 | ---: | ---: | ---: | ---: |
-| 100.00% | 100.00% | 0.00% | 22 / 22 / 2 / 0 / 0 |
+| 97.67% | 91.30% | 2.33% | 22 / 18 / 3 / 0 / 0 |
 
 **LLM ablation** (`npm run reconcile -- --seed 42 --compare-llm --llm-provider ollama --llm-model qwen2.5-coder:7b`, measured run):
 
 | | With LLM | Without LLM |
 | --- | ---: | ---: |
-| Match rate / Recall | 100.00% | 100.00% |
-| Precision | 100.00% | 100.00% |
-| FP rate | 0.00% | 0.00% |
-| LLM matches | 0 | 0 |
-| Provider | ollama (qwen2.5-coder:7b) | none |
-
-2 LLM calls, both ambiguous splits honestly `unsure` — the tier fires and refuses to guess.
-
-### Calibration margin
-
-Fuzzy weights: amount **0.4** / date **0.3** / reference **0.3** (`src/engine/config.ts`); accept threshold **0.75**; truncated-UTR prefix floor **0.92**.
-
-- Truncated true pair: amount=1, date=+3d → `dateScore = 1 - 3/4 = 0.25`, ref=0.92 → composite **0.4 + 0.075 + 0.276 = 0.751** (clears accept).
-- Default decoy (`near_duplicate_decoy`): amount **±1.2%**, date **+2d**, weaker UTR → composite ~**0.586** (stays below 0.75).
-- Closer decoys clear the 0.75 threshold — with the LLM tier enabled they land in the ambiguous band for LLM/human review; skip-llm they score as FPs (see grid). The ±0.5%/+1d cell also drops recall to **93.48%** because the accepted decoy steals the bank credit from the true pair.
+| Match rate / Recall | 95.65% | 91.30% |
+| Precision | 97.78% | 97.67% |
+| FP rate | 2.22% | 2.33% |
+| LLM matches | 2 | 0 |
+| Provider | ollama | none |
 
 Full grid: [`output/decoy-sweep.md`](output/decoy-sweep.md) (`npm run sweep-decoys`).
 
@@ -134,16 +124,13 @@ npm run check-baseline
 - Split matching is bounded (pool ≤25, combo ≤6)
 - Ambiguous multi-solution batches are not auto-picked; they are routed to the LLM/human tier with the tied combinations listed
 - No FX conversion
-- Seed 42 skip-llm clears boundary via prefix-aware UTR floor 0.92; decoy deferral 16/16 at default ±1.2%/+2d. Residual LLM work is mainly ambiguous splits / unsure cases
-- Duplicate bank credits: first claim (exact/fuzzy/split-pool enqueue) wins; same-UTR leftovers are blocked before split and flagged `duplicate_bank` (prevents coincidental subset-sum FPs)
-- Measured `--compare-llm` with Ollama `qwen2.5-coder:7b`: 2 LLM calls on the ambiguous splits, both `unsure` (tier fires, refuses to guess); metrics stay 100/100/0. Prior Ollama run (before guards) lifted recall 91.30% → 95.65% on leftover fuzzy pairs — historical only
-- Ollama LLM calls fix `temperature: 0` and pass the reconcile seed; Anthropic uses `temperature: 0`. Remaining variance is model/runtime behaviour, not unset sampling knobs
-- Exception rows in the terminal/markdown report are grouped by `relatedIds` for display; `report.json` keeps per-record flags so scoring is unchanged
-- Calibration margin and decoy-offset grid: see README Calibration margin and `output/decoy-sweep.md`
+- Near dup / boundary cases need LLM or human for full recall
+- On the Ollama `llama3.2` ablation run (seed 42), the model correctly matched 2 of 4 residual true pairs (`bank_0039`/`setl_0039`, `bank_0042`/`setl_0044`) using amount + UTR signals, but wrongly rejected the other two true near dup pairs (`bank_0040`/`setl_0040`, `bank_0041`/`setl_0042`) as `no_match` because truncated UTRs weren’t treated as prefixes. Those stayed false negatives.
+- Local LLM output isn’t deterministic. A follow-up run with the same seed and model resolved a different 3 of 4 residual pairs (recall 97.83% in `output/report.json`, which the dashboard uses) and rejected `bank_0042`/`setl_0044` for the same truncated-UTR reason. We didn’t re-run until the numbers looked nicer.
 
 ## What broke, and what we did about it
 
-**The first version scored a perfect 100%.** Seed 42 came back with 100% match rate, precision, and recall, 0% false positives, and the LLM and human tiers never fired. On a track that cares about measured accuracy over a cherry-picked win, that looked like easy data, not a flawless engine. We rebuilt the generator with near duplicate decoys, boundary UTR mangles at the fuzzy threshold, and split batches with a coincidental decoy sum. That honest baseline sat at **~97.67% precision / 91.30% recall / 2.33% FP** until the duplicate-UTR split guard and prefix-floor 0.92 removed the last deterministic FP/FN — seed 42 skip-llm is again **100% / 100% / 0% FP**, but now against the hard generator.
+**The first version scored a perfect 100%.** Seed 42 came back with 100% match rate, precision, and recall, 0% false positives, and the LLM and human tiers never fired. On a track that cares about measured accuracy over a cherry-picked win, that looked like easy data, not a flawless engine. We rebuilt the generator with near duplicate decoys, boundary UTR mangles at the fuzzy threshold, and split batches with a coincidental decoy sum. The skip-llm baseline is now **97.67% precision / 91.30% recall / 2.33% FP**. Lower, but more honest, and the leftover tiers actually have something to do.
 
 **The first LLM ablation was a no-op.** `--compare-llm` printed the same numbers on both sides because both silently fell back to provider `none`. We ran it again against local Ollama (`llama3.2`): recall went from **91.30% → 95.65%**, correctly resolving **2 of 4** ambiguous pairs. The two false `no_match` calls are under Known Limitations instead of being swept under the rug.
 
