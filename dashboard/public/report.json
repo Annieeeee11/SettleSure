@@ -1,47 +1,47 @@
 {
   "metrics": {
-    "matchRate": 0.8478260869565217,
+    "matchRate": 0.9347826086956522,
     "precision": 1.0,
-    "recall": 0.8478260869565217,
+    "recall": 0.9347826086956522,
     "falsePositiveRate": 0.0,
-    "exceptionAccuracy": 0.6956521739130435,
+    "exceptionAccuracy": 0.8421052631578947,
     "trueMatchCount": 46,
-    "predictedMatchCount": 39,
-    "truePositive": 39,
+    "predictedMatchCount": 43,
+    "truePositive": 43,
     "falsePositive": 0,
-    "falseNegative": 7,
+    "falseNegative": 3,
     "trueExceptionCount": 32,
-    "predictedExceptionCount": 46,
+    "predictedExceptionCount": 38,
     "correctlyFlaggedExceptions": 32,
-    "throughputRecordsPerSec": 1495.75,
+    "throughputRecordsPerSec": 0.57,
     "timing": {
-      "exactMs": 0.962,
-      "fuzzyMs": 82.407,
-      "splitMs": 0.301,
-      "llmMs": 0.663,
-      "totalMs": 85.576
+      "exactMs": 0.082,
+      "fuzzyMs": 5.515,
+      "splitMs": 0.068,
+      "llmMs": 223454.721,
+      "totalMs": 223471.04
     },
     "matchSourceBreakdown": {
       "exact": 20,
       "fuzzy": 17,
       "split": 2,
-      "llm": 0,
+      "llm": 4,
       "human": 0
     },
     "bankCount": 57,
     "settlementCount": 71,
     "paymentCount": 71,
     "seed": 42,
-    "llmEnabled": false,
-    "llmProvider": "none",
+    "llmEnabled": true,
+    "llmProvider": "ollama",
     "byAmbiguityLevel": {
       "boundary": {
-        "matchRate": 0.42857142857142855,
+        "matchRate": 0.7142857142857143,
         "precision": 1.0,
-        "recall": 0.42857142857142855,
+        "recall": 0.7142857142857143,
         "trueMatchCount": 7,
-        "predictedMatchCount": 3,
-        "truePositive": 3,
+        "predictedMatchCount": 5,
+        "truePositive": 5,
         "falsePositive": 0,
         "notes": "at fuzzy threshold edge"
       },
@@ -56,12 +56,12 @@
         "notes": "trivial exact/fuzzy cases"
       },
       "decoy": {
-        "matchRate": 0.0,
+        "matchRate": 0.6666666666666666,
         "precision": 1.0,
-        "recall": 0.0,
+        "recall": 0.6666666666666666,
         "trueMatchCount": 3,
-        "predictedMatchCount": 0,
-        "truePositive": 0,
+        "predictedMatchCount": 2,
+        "truePositive": 2,
         "falsePositive": 0,
         "correctlyDeferred": 16,
         "deferredTotal": 16,
@@ -78,6 +78,34 @@
         "correctlyDeferred": 15,
         "deferredTotal": 15,
         "notes": "correctly flagged as exception"
+      }
+    },
+    "llmAblation": {
+      "withLlm": {
+        "matchRate": 0.9347826086956522,
+        "precision": 1.0,
+        "recall": 0.9347826086956522,
+        "falsePositiveRate": 0.0,
+        "llmMatches": 4,
+        "provider": "ollama"
+      },
+      "withoutLlm": {
+        "matchRate": 0.8478260869565217,
+        "precision": 1.0,
+        "recall": 0.8478260869565217,
+        "falsePositiveRate": 0.0,
+        "llmMatches": 0
+      },
+      "providerAvailable": true,
+      "callStats": {
+        "callCount": 9,
+        "verdictMatch": 4,
+        "verdictNoMatch": 0,
+        "verdictUnsure": 5,
+        "providerErrors": 0,
+        "latencyMsMin": 10309.075,
+        "latencyMsMax": 67552.969,
+        "latencyMsMean": 24826.072
       }
     }
   },
@@ -364,6 +392,34 @@
       "confidence": 1.0,
       "matchedBy": "split",
       "reasoning": "Unique subset-sum: setl_0051 + setl_0052 + setl_0053 = 787.99"
+    },
+    {
+      "bankCreditId": "bank_0036",
+      "settlementId": "setl_0036",
+      "confidence": 0.8,
+      "matchedBy": "llm",
+      "reasoning": "LLM verdict: match — UTR prefix match and net amount match"
+    },
+    {
+      "bankCreditId": "bank_0037",
+      "settlementId": "setl_0037",
+      "confidence": 0.8,
+      "matchedBy": "llm",
+      "reasoning": "LLM verdict: match — UTR prefix match and net amount match"
+    },
+    {
+      "bankCreditId": "bank_0041",
+      "settlementId": "setl_0044",
+      "confidence": 0.8,
+      "matchedBy": "llm",
+      "reasoning": "LLM verdict: match — UTR similarity 0.87 and date match"
+    },
+    {
+      "bankCreditId": "bank_0042",
+      "settlementId": "setl_0046",
+      "confidence": 0.8,
+      "matchedBy": "llm",
+      "reasoning": "LLM verdict: match — UTR similarity 0.87 and date match"
     }
   ],
   "exceptions": [
@@ -428,41 +484,9 @@
       ]
     },
     {
-      "recordId": "bank_0036",
-      "source": "bank",
-      "reason": "ambiguous — LLM unavailable",
-      "relatedIds": [
-        "setl_0036"
-      ]
-    },
-    {
-      "recordId": "setl_0036",
-      "source": "settlement",
-      "reason": "ambiguous — LLM unavailable",
-      "relatedIds": [
-        "bank_0036"
-      ]
-    },
-    {
-      "recordId": "bank_0037",
-      "source": "bank",
-      "reason": "ambiguous — LLM unavailable",
-      "relatedIds": [
-        "setl_0037"
-      ]
-    },
-    {
-      "recordId": "setl_0037",
-      "source": "settlement",
-      "reason": "ambiguous — LLM unavailable",
-      "relatedIds": [
-        "bank_0037"
-      ]
-    },
-    {
       "recordId": "bank_0038",
       "source": "bank",
-      "reason": "ambiguous — LLM unavailable",
+      "reason": "ambiguous — LLM declined — Insufficient evidence to determine match",
       "relatedIds": [
         "setl_0038",
         "setl_0039"
@@ -471,7 +495,7 @@
     {
       "recordId": "setl_0038",
       "source": "settlement",
-      "reason": "ambiguous — LLM unavailable",
+      "reason": "ambiguous — LLM declined — Insufficient evidence to determine match",
       "relatedIds": [
         "bank_0038",
         "setl_0039"
@@ -480,7 +504,7 @@
     {
       "recordId": "bank_0039",
       "source": "bank",
-      "reason": "ambiguous — LLM unavailable",
+      "reason": "ambiguous — LLM declined — Insufficient evidence to determine match",
       "relatedIds": [
         "setl_0040",
         "setl_0041"
@@ -489,7 +513,7 @@
     {
       "recordId": "setl_0040",
       "source": "settlement",
-      "reason": "ambiguous — LLM unavailable",
+      "reason": "ambiguous — LLM declined — Insufficient evidence to determine match",
       "relatedIds": [
         "bank_0039",
         "setl_0041"
@@ -498,7 +522,7 @@
     {
       "recordId": "bank_0040",
       "source": "bank",
-      "reason": "ambiguous — LLM unavailable",
+      "reason": "ambiguous — LLM declined — Insufficient evidence to determine match",
       "relatedIds": [
         "setl_0042",
         "setl_0043"
@@ -507,52 +531,16 @@
     {
       "recordId": "setl_0042",
       "source": "settlement",
-      "reason": "ambiguous — LLM unavailable",
+      "reason": "ambiguous — LLM declined — Insufficient evidence to determine match",
       "relatedIds": [
         "bank_0040",
         "setl_0043"
       ]
     },
     {
-      "recordId": "bank_0041",
-      "source": "bank",
-      "reason": "ambiguous — LLM unavailable",
-      "relatedIds": [
-        "setl_0044",
-        "setl_0045"
-      ]
-    },
-    {
-      "recordId": "setl_0044",
-      "source": "settlement",
-      "reason": "ambiguous — LLM unavailable",
-      "relatedIds": [
-        "bank_0041",
-        "setl_0045"
-      ]
-    },
-    {
-      "recordId": "bank_0042",
-      "source": "bank",
-      "reason": "ambiguous — LLM unavailable",
-      "relatedIds": [
-        "setl_0046",
-        "setl_0047"
-      ]
-    },
-    {
-      "recordId": "setl_0046",
-      "source": "settlement",
-      "reason": "ambiguous — LLM unavailable",
-      "relatedIds": [
-        "bank_0042",
-        "setl_0047"
-      ]
-    },
-    {
       "recordId": "bank_0045",
       "source": "bank",
-      "reason": "ambiguous split — LLM unavailable: ambiguous split — multiple settlement combinations sum to credit: setl_0054+setl_0055 | setl_0056+setl_0057",
+      "reason": "ambiguous — LLM declined (split) — Insufficient evidence to determine the true batch",
       "exceptionType": "batched_payout",
       "relatedIds": [
         "setl_0054",
@@ -564,7 +552,7 @@
     {
       "recordId": "bank_0046",
       "source": "bank",
-      "reason": "ambiguous split — LLM unavailable: ambiguous split — multiple settlement combinations sum to credit: setl_0058+setl_0059 | setl_0060+setl_0061",
+      "reason": "ambiguous — LLM declined (split) — Insufficient evidence to determine the true batch",
       "exceptionType": "batched_payout",
       "relatedIds": [
         "setl_0058",

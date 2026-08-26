@@ -3,29 +3,29 @@
 Razorpay-style 3-way flow: **Payment → Settlement → Bank payout credit** (UTR join).
 
 Seed: `42` · Payments: 71 · Settlements: 71 · Bank credits: 57
-LLM pass: disabled / unavailable
+LLM pass: enabled (ollama)
 
 ## Headline metrics
 
 | Metric | Value |
 | --- | --- |
-| Match rate (recall on true matches) | 84.78% |
+| Match rate (recall on true matches) | 93.48% |
 | Precision | 100.00% |
-| Recall | 84.78% |
+| Recall | 93.48% |
 | False positive rate | 0.00% |
-| Exception accuracy | 69.57% |
-| Throughput | 1495.75 records/sec |
-| Runtime (total) | 85.58 ms |
+| Exception accuracy | 84.21% |
+| Throughput | 0.57 records/sec |
+| Runtime (total) | 223471.04 ms |
 
 ### Counts
 
 - True matches in ground truth: 46
-- Predicted matches: 39
-- True positives: 39
+- Predicted matches: 43
+- True positives: 43
 - False positives: 0
-- False negatives: 7
+- False negatives: 3
 - True exception records: 32
-- Predicted exception records: 46
+- Predicted exception records: 38
 - Correctly flagged exceptions: 32
 
 ## Match-source breakdown
@@ -35,25 +35,36 @@ LLM pass: disabled / unavailable
 | Exact | 20 |
 | Fuzzy | 17 |
 | Split | 2 |
-| LLM | 0 |
+| LLM | 4 |
 | Human | 0 |
 
 | Pass timing | ms |
 | --- | ---: |
-| Exact | 0.96 |
-| Fuzzy | 82.41 |
-| Split | 0.30 |
-| LLM | 0.66 |
-| Total | 85.58 |
+| Exact | 0.08 |
+| Fuzzy | 5.51 |
+| Split | 0.07 |
+| LLM | 223454.72 |
+| Total | 223471.04 |
 
 ## Accuracy by case difficulty
 
 | Difficulty | Match rate | Precision | Deferred | Notes |
 | --- | --- | --- | --- | --- |
 | Clear | 100.00% | 100.00% | — | trivial exact/fuzzy cases |
-| Boundary | 42.86% | 100.00% | — | at fuzzy threshold edge |
-| Decoy | 0.00% | 100.00% | 100.00% | correctly deferred, not auto-resolved to decoy |
+| Boundary | 71.43% | 100.00% | — | at fuzzy threshold edge |
+| Decoy | 66.67% | 100.00% | 100.00% | correctly deferred, not auto-resolved to decoy |
 | Unresolvable | — | — | 100.00% | correctly flagged as exception |
+
+## LLM ablation
+
+| | With LLM | Without LLM |
+| --- | ---: | ---: |
+| Match rate | 93.48% | 84.78% |
+| Precision | 100.00% | 100.00% |
+| Recall | 93.48% | 84.78% |
+| FP rate | 0.00% | 0.00% |
+| LLM matches | 4 | 0 |
+| Provider | ollama | none |
 
 ## Exception list
 
@@ -68,25 +79,23 @@ LLM pass: disabled / unavailable
 | setl_0069 | settlement | currency mismatch, not auto-resolved |
 | bank_0055 | bank | duplicate bank credit — UTR already settled by bank_0054 |
 | bank_0057 | bank | duplicate bank credit — UTR already settled by bank_0056 |
-| bank_0036, setl_0036 | bank+settlement | ambiguous — LLM unavailable |
-| bank_0037, setl_0037 | bank+settlement | ambiguous — LLM unavailable |
-| bank_0038, setl_0038, setl_0039 | bank+settlement | ambiguous — LLM unavailable |
-| bank_0039, setl_0040, setl_0041 | bank+settlement | ambiguous — LLM unavailable |
-| bank_0040, setl_0042, setl_0043 | bank+settlement | ambiguous — LLM unavailable |
-| bank_0041, setl_0044, setl_0045 | bank+settlement | ambiguous — LLM unavailable |
-| bank_0042, setl_0046, setl_0047 | bank+settlement | ambiguous — LLM unavailable |
-| bank_0045, setl_0054, setl_0055, setl_0056, setl_0057 | bank+settlement | ambiguous split — LLM unavailable: ambiguous split — multiple settlement combinations sum to credit: setl_0054+setl_0055 \| setl_0056+setl_0057 |
-| bank_0046, setl_0058, setl_0059, setl_0060, setl_0061 | bank+settlement | ambiguous split — LLM unavailable: ambiguous split — multiple settlement combinations sum to credit: setl_0058+setl_0059 \| setl_0060+setl_0061 |
+| bank_0038, setl_0038, setl_0039 | bank+settlement | ambiguous — LLM declined — Insufficient evidence to determine match |
+| bank_0039, setl_0040, setl_0041 | bank+settlement | ambiguous — LLM declined — Insufficient evidence to determine match |
+| bank_0040, setl_0042, setl_0043 | bank+settlement | ambiguous — LLM declined — Insufficient evidence to determine match |
+| bank_0045, setl_0054, setl_0055, setl_0056, setl_0057 | bank+settlement | ambiguous — LLM declined (split) — Insufficient evidence to determine the true batch |
+| bank_0046, setl_0058, setl_0059, setl_0060, setl_0061 | bank+settlement | ambiguous — LLM declined (split) — Insufficient evidence to determine the true batch |
 | bank_0047 | bank | no plausible counterpart in window |
 | bank_0048 | bank | no plausible counterpart in window |
 | bank_0051 | bank | no plausible counterpart in window |
 | bank_0052 | bank | no plausible counterpart in window |
 | bank_0053 | bank | no plausible counterpart in window |
+| setl_0045 | settlement | settlement present, bank credit missing (payout may be in transit) |
+| setl_0047 | settlement | settlement present, bank credit missing (payout may be in transit) |
 | setl_0065 | settlement | settlement present, bank credit missing (payout may be in transit) |
 | setl_0066 | settlement | settlement present, bank credit missing (payout may be in transit) |
 | setl_0067 | settlement | settlement present, bank credit missing (payout may be in transit) |
 
-_Grouped by relatedIds for display (26 groups from 46 per-record flags). Scoring still uses per-record exceptions._
+_Grouped by relatedIds for display (24 groups from 38 per-record flags). Scoring still uses per-record exceptions._
 
 ## Known limitations
 

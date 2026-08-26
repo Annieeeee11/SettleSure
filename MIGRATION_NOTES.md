@@ -94,6 +94,21 @@ npm run bench-throughput
 
 Harness: [`scripts/bench-throughput.mjs`](scripts/bench-throughput.mjs), Rust example [`crates/settlesure-cli/examples/bench_deterministic.rs`](crates/settlesure-cli/examples/bench_deterministic.rs), TS script in oracle worktree `scripts/bench-deterministic.ts`.
 
+**Scaling insight:** Speedup shrinks from 3.6× (1×) to ~2.2× (10×/50×) because fuzzy dominates and scales O(banks × settlements) in both engines. Rust wins on constant-factor overhead, not algorithmic complexity.
+
+## Docker (CLI-only, verified)
+
+```bash
+docker build -t settlesure .
+docker run --rm settlesure --seed 42 --skip-llm --no-banner
+```
+
+Verified 2026-08-27: image ~160 MB; seed-42 `--skip-llm` produces **84.78% recall, 100% precision, 20/17/2/0/0** match sources inside the container.
+
+The Dockerfile uses stub-crate layer caching ([`docker/stub-crates.sh`](docker/stub-crates.sh)); real sources are copied then rebuilt with `find … -exec touch` so Cargo does not ship the stub `fn main() {}` binary.
+
+**Container scope:** No Node/dashboard. `--compare-llm --llm-provider ollama` warns `localhost:11434 unreachable` and falls back to `LLM: none` (expected — Ollama runs on the host).
+
 ## Behavior not ported 1:1 (harmless)
 
 1. **Demo correction timestamps** — TS used wall-clock `new Date().toISOString()`. Rust uses fixed `2026-01-01T00:00:00.000Z`. Matching ignores `ts`.

@@ -17,9 +17,10 @@ COPY docker/stub-crates.sh docker/stub-crates.sh
 RUN chmod +x docker/stub-crates.sh && ./docker/stub-crates.sh \
   && cargo build --release -p settlesure-cli
 
-# Layer 3: real sources
+# Layer 3: real sources (touch so mtime beats stub-build artifacts)
 COPY crates/ crates/
-RUN cargo build --release -p settlesure-cli
+RUN find crates -name '*.rs' -exec touch {} + \
+  && cargo build --release -p settlesure-cli
 
 FROM debian:bookworm-slim
 RUN apt-get update \
