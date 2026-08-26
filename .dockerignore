@@ -1,0 +1,12 @@
+target/
+**/target/
+node_modules/
+dashboard/node_modules/
+.git/
+.github/
+output/
+benchmarks/fixtures/
+.cursor/
+*.md
+!README.md
+settlesure-ts-oracle/

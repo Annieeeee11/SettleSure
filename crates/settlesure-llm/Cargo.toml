@@ -1,0 +1,16 @@
+[package]
+name = "settlesure-llm"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "LLM provider trait + Anthropic/Ollama (async, isolated)"
+
+[dependencies]
+settlesure-types = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+tokio = { workspace = true }
+reqwest = { workspace = true }
+async-trait = "0.1.88"

@@ -1,0 +1,13 @@
+[package]
+name = "settlesure-scoring"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Metrics and report generation"
+
+[dependencies]
+settlesure-types = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }

@@ -1,0 +1,46 @@
+# SettleSure Cargo workspace — Razorpay-style 3-way settlement reconciliation.
+# Dependencies are justified in DEPENDENCIES.md.
+
+[workspace]
+resolver = "2"
+members = [
+    "crates/settlesure-types",
+    "crates/settlesure-data",
+    "crates/settlesure-engine",
+    "crates/settlesure-scoring",
+    "crates/settlesure-llm",
+    "crates/settlesure-cli",
+    "crates/settlesure-integration",
+]
+default-members = ["crates/settlesure-cli"]
+
+[workspace.package]
+version = "2.0.0"
+edition = "2021"
+license = "MIT"
+authors = ["SettleSure"]
+
+[workspace.dependencies]
+# Shared domain serialization matching data/*.json wire format
+serde = { version = "1.0.219", features = ["derive"] }
+serde_json = "1.0.140"
+# Typed errors; only main() decides exit codes
+thiserror = "2.0.12"
+# Async runtime for LLM HTTP only (engine stays sync)
+tokio = { version = "1.44.1", features = ["rt-multi-thread", "macros", "time", "fs"] }
+# HTTP client for Anthropic + Ollama
+reqwest = { version = "0.12.15", default-features = false, features = ["json", "rustls-tls"] }
+# Structured logging in libraries; CLI owns subscriber
+tracing = "0.1.41"
+tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
+# CLI flag parsing
+clap = { version = "4.5.32", features = ["derive", "env"] }
+# Property tests for fuzzy/split bounds
+proptest = "1.6.0"
+# Date arithmetic matching JS Date.UTC / toISOString day math
+chrono = { version = "0.4.40", default-features = false, features = ["std", "clock"] }
+settlesure-types = { path = "crates/settlesure-types" }
+settlesure-data = { path = "crates/settlesure-data" }
+settlesure-engine = { path = "crates/settlesure-engine" }
+settlesure-scoring = { path = "crates/settlesure-scoring" }
+settlesure-llm = { path = "crates/settlesure-llm" }

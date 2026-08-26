@@ -1,0 +1,629 @@
+//! SettleSure CLI — argument parsing and orchestration only (no matching logic).
+
+mod banner;
+
+use clap::Parser;
+use settlesure_data::{generate_and_write_with_opts, GenerateDatasetOpts};
+use settlesure_engine::{
+    load_corrections_with_fallback, reconcile, suggest_fuzzy_threshold, LlmPassResult,
+};
+use settlesure_llm::{llm_resolve, select_llm_provider, LlmSelectOptions};
+use settlesure_scoring::{
+    format_terminal, write_report, ReportPaths, KNOWN_LIMITATIONS,
+};
+use settlesure_scoring::score_against_ground_truth;
+use settlesure_types::{
+    AmbiguityLevel, Correction, FullReport, GroundTruthLabel, GroundTruthLabelKind,
+    LlmAblationSide, LlmAblationSummary, LlmProviderChoice, MatchResult, MetricRange,
+    ReconcileConfig, RobustnessSummary, ScoreReport, Secret, Settlement, DEFAULT_CONFIG,
+};
+use std::collections::HashMap;
+use std::fs;
+use std::io::Write;
+use std::path::{Path, PathBuf};
+use std::process::ExitCode;
+use tracing::{info, warn};
+
+#[derive(Debug, Parser)]
+#[command(
+    name = "settlesure",
+    about = "Razorpay-style payment gateway settlement reconciliation\n(Payment → Settlement → Bank payout credit via UTR).",
+    disable_help_subcommand = true
+)]
+struct Args {
+    /// Seeded RNG (default: 42)
+    #[arg(long, default_value_t = 42)]
+    seed: u32,
+
+    /// Write data/*.json and exit
+    #[arg(long)]
+    generate_only: bool,
+
+    /// Force no LLM (same as --llm-provider none)
+    #[arg(long)]
+    skip_llm: bool,
+
+    /// LLM provider: anthropic | ollama | none
+    #[arg(long, value_parser = parse_provider)]
+    llm_provider: Option<LlmProviderChoice>,
+
+    /// Ollama model (default: llama3.2)
+    #[arg(long, default_value = "llama3.2")]
+    llm_model: String,
+
+    /// Apply corrections (output/ or data/demo_)
+    #[arg(long)]
+    apply_corrections: bool,
+
+    /// Run seeds seed..seed+n-1; report mean±range
+    #[arg(long, default_value_t = 1)]
+    runs: u32,
+
+    /// Ablate LLM on vs off for the same seed
+    #[arg(long)]
+    compare_llm: bool,
+
+    /// Skip the startup logo (also skipped when not a TTY)
+    #[arg(long)]
+    no_banner: bool,
+
+    /// Write NDJSON match-list dump (payment/settlement/bank triples + sources)
+    #[arg(long, value_name = "PATH", num_args = 0..=1, default_missing_value = "output/matches.ndjson")]
+    dump_matches: Option<String>,
+
+    /// Multiply adversarial class counts when generating data (default 1)
+    #[arg(long, default_value_t = 1)]
+    batch_scale: u32,
+
+    /// Override data output directory (for --generate-only / benchmarks)
+    #[arg(long, value_name = "DIR")]
+    output_data_dir: Option<PathBuf>,
+
+    /// Workspace root (defaults to cwd)
+    #[arg(long, hide = true)]
+    root: Option<PathBuf>,
+}
+
+fn parse_provider(s: &str) -> Result<LlmProviderChoice, String> {
+    match s {
+        "anthropic" => Ok(LlmProviderChoice::Anthropic),
+        "ollama" => Ok(LlmProviderChoice::Ollama),
+        "none" => Ok(LlmProviderChoice::None),
+        other => Err(format!(
+            "--llm-provider must be anthropic|ollama|none, got {other}"
+        )),
+    }
+}
+
+/// Single validated config built once at startup — no ad-hoc env reads elsewhere.
+#[derive(Debug, Clone)]
+struct AppConfig {
+    root: PathBuf,
+    seed: u32,
+    generate_only: bool,
+    skip_llm: bool,
+    llm_provider: Option<LlmProviderChoice>,
+    llm_model: String,
+    apply_corrections: bool,
+    runs: u32,
+    compare_llm: bool,
+    no_banner: bool,
+    dump_matches: Option<String>,
+    batch_scale: u32,
+    output_data_dir: Option<PathBuf>,
+    anthropic_api_key: Option<Secret<String>>,
+}
+
+impl AppConfig {
+    fn from_args(args: Args) -> Self {
+        let mut skip_llm = args.skip_llm;
+        let mut llm_provider = args.llm_provider;
+        if skip_llm {
+            llm_provider = Some(LlmProviderChoice::None);
+        }
+        if llm_provider == Some(LlmProviderChoice::None) {
+            skip_llm = true;
+        }
+
+        let anthropic_api_key = std::env::var("ANTHROPIC_API_KEY")
+            .ok()
+            .filter(|s| !s.is_empty())
+            .map(Secret::new);
+
+        Self {
+            root: args.root.unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."))),
+            seed: args.seed,
+            generate_only: args.generate_only,
+            skip_llm,
+            llm_provider,
+            llm_model: args.llm_model,
+            apply_corrections: args.apply_corrections,
+            runs: args.runs.max(1),
+            compare_llm: args.compare_llm,
+            no_banner: args.no_banner,
+            dump_matches: args.dump_matches,
+            batch_scale: args.batch_scale.max(1),
+            output_data_dir: args.output_data_dir,
+            anthropic_api_key,
+        }
+    }
+
+    fn data_dir(&self) -> PathBuf {
+        self.root.join("data")
+    }
+
+    fn generate_target_dir(&self) -> PathBuf {
+        self.output_data_dir
+            .clone()
+            .unwrap_or_else(|| self.data_dir())
+    }
+
+    fn generate_opts(&self) -> GenerateDatasetOpts {
+        GenerateDatasetOpts {
+            batch_scale: self.batch_scale,
+            ..GenerateDatasetOpts::default()
+        }
+    }
+
+    fn output_dir(&self) -> PathBuf {
+        self.root.join("output")
+    }
+
+    fn reconcile_config(&self) -> ReconcileConfig {
+        let mut cfg = DEFAULT_CONFIG.clone();
+        cfg.skip_llm = self.skip_llm;
+        cfg.llm_provider = self.llm_provider;
+        cfg.llm_model = Some(self.llm_model.clone());
+        cfg.seed = Some(self.seed);
+        cfg.apply_corrections = Some(self.apply_corrections);
+        cfg
+    }
+
+    fn llm_select(&self, skip: bool, provider: Option<LlmProviderChoice>) -> LlmSelectOptions {
+        LlmSelectOptions {
+            skip_llm: skip,
+            llm_provider: provider,
+            llm_model: Some(self.llm_model.clone()),
+            seed: self.seed,
+            anthropic_api_key: self.anthropic_api_key.clone(),
+        }
+    }
+}
+
+fn to_engine_llm(r: settlesure_llm::LlmResolveResult) -> LlmPassResult {
+    LlmPassResult {
+        matches: r.matches,
+        exceptions: r.exceptions,
+        enabled: r.enabled,
+        provider_name: r.provider_name,
+        call_stats: r.call_stats,
+    }
+}
+
+fn copy_report_to_dashboard(root: &Path, json_path: &Path) {
+    let dashboard = root.join("dashboard");
+    if !dashboard.exists() {
+        return;
+    }
+    let dest_dir = dashboard.join("public");
+    if let Err(e) = fs::create_dir_all(&dest_dir) {
+        warn!("could not create dashboard public dir: {e}");
+        return;
+    }
+    let dest = dest_dir.join("report.json");
+    if let Err(e) = fs::copy(json_path, &dest) {
+        warn!("could not copy report to dashboard: {e}");
+    }
+}
+
+fn mean_min_max(values: &[f64]) -> MetricRange {
+    let mean = values.iter().sum::<f64>() / values.len() as f64;
+    MetricRange {
+        mean: (mean * 10000.0).round() / 10000.0,
+        min: values.iter().copied().fold(f64::INFINITY, f64::min),
+        max: values.iter().copied().fold(f64::NEG_INFINITY, f64::max),
+    }
+}
+
+fn sorted_set_key(ids: &[String]) -> String {
+    let mut v: Vec<&str> = ids.iter().map(String::as_str).collect();
+    v.sort();
+    v.join(",")
+}
+
+fn find_ambiguity_level(
+    bank_credit_id: &str,
+    settlement_ids: &[String],
+    ground_truth: &[GroundTruthLabel],
+) -> Option<AmbiguityLevel> {
+    let key = sorted_set_key(settlement_ids);
+    for g in ground_truth {
+        if g.label != GroundTruthLabelKind::Match {
+            continue;
+        }
+        if g.bank_credit_id.as_deref() != Some(bank_credit_id) {
+            continue;
+        }
+        if let Some(ref ids) = g.settlement_ids {
+            if ids.len() > 1 && sorted_set_key(ids) == key {
+                return Some(g.ambiguity_level);
+            }
+        } else if settlement_ids.len() == 1
+            && g.settlement_id.as_deref() == Some(settlement_ids[0].as_str())
+        {
+            return Some(g.ambiguity_level);
+        }
+    }
+    None
+}
+
+fn dump_matches_ndjson(
+    path: &Path,
+    matches: &[MatchResult],
+    settlements: &[Settlement],
+    ground_truth: &[GroundTruthLabel],
+) -> Result<(), settlesure_types::SettleSureError> {
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    let mut file = fs::File::create(path)?;
+    let by_setl: HashMap<&str, &Settlement> = settlements
+        .iter()
+        .map(|s| (s.settlement_id.as_str(), s))
+        .collect();
+    for m in matches {
+        let component_ids: Vec<String> = m
+            .components
+            .clone()
+            .unwrap_or_else(|| vec![m.settlement_id.clone()]);
+        let ambiguity = find_ambiguity_level(&m.bank_credit_id, &component_ids, ground_truth);
+        let amb_str = ambiguity.map(|a| a.as_str());
+        let source_str = match m.matched_by {
+            settlesure_types::MatchSource::Exact => "exact",
+            settlesure_types::MatchSource::Fuzzy => "fuzzy",
+            settlesure_types::MatchSource::Split => "split",
+            settlesure_types::MatchSource::Llm => "llm",
+            settlesure_types::MatchSource::Human => "human",
+        };
+        for setl_id in &component_ids {
+            let payment_id = by_setl
+                .get(setl_id.as_str())
+                .map(|s| s.payment_id.as_str());
+            let line = serde_json::json!({
+                "payment_id": payment_id,
+                "settlement_id": setl_id,
+                "bank_credit_id": m.bank_credit_id,
+                "match_source": source_str,
+                "ambiguity_level": amb_str,
+            });
+            writeln!(file, "{line}")?;
+        }
+    }
+    Ok(())
+}
+
+async fn run_once(
+    app: &AppConfig,
+    seed: u32,
+    skip_llm: bool,
+    llm_provider: Option<LlmProviderChoice>,
+    corrections: &[Correction],
+) -> Result<
+    (
+        ScoreReport,
+        FullReport,
+        String,
+        Option<settlesure_types::LlmCallStats>,
+    ),
+    settlesure_types::SettleSureError,
+> {
+    let dataset = generate_and_write_with_opts(seed, &app.data_dir(), app.generate_opts())?;
+    let mut cfg = app.reconcile_config();
+    cfg.seed = Some(seed);
+    cfg.skip_llm = skip_llm;
+    cfg.llm_provider = llm_provider;
+    cfg.llm_model = Some(app.llm_model.clone());
+
+    let select_opts = app.llm_select(skip_llm, llm_provider);
+    let selected_name = select_llm_provider(&select_opts).await.name;
+
+    let mut llm_call_stats = None;
+    let result = reconcile(
+        &dataset.payments,
+        &dataset.settlements,
+        &dataset.bank_credits,
+        &cfg,
+        corrections,
+        |ambiguous| {
+            // Bridge async LLM into sync engine callback via current runtime.
+            let opts = app.llm_select(skip_llm, llm_provider);
+            let ambiguous = ambiguous.to_vec();
+            let rt_result = tokio::task::block_in_place(|| {
+                tokio::runtime::Handle::current()
+                    .block_on(async { llm_resolve(&ambiguous, &opts).await })
+            });
+            llm_call_stats = rt_result.call_stats.clone();
+            to_engine_llm(rt_result)
+        },
+    );
+
+    let llm_enabled = selected_name != "none" && !skip_llm;
+    let metrics = score_against_ground_truth(
+        &result,
+        &dataset.ground_truth,
+        seed,
+        llm_enabled,
+        selected_name.as_str(),
+    );
+
+    let full = FullReport {
+        metrics: metrics.clone(),
+        matches: result.matches.clone(),
+        exceptions: result.exceptions,
+        known_limitations: KNOWN_LIMITATIONS.iter().map(|s| (*s).to_string()).collect(),
+    };
+
+    if let Some(ref dump_rel) = app.dump_matches {
+        let path = PathBuf::from(dump_rel);
+        let path = if path.is_absolute() {
+            path
+        } else {
+            app.root.join(path)
+        };
+        dump_matches_ndjson(
+            &path,
+            &result.matches,
+            &dataset.settlements,
+            &dataset.ground_truth,
+        )?;
+        eprintln!("Wrote match dump to {}", path.display());
+    }
+
+    Ok((metrics, full, selected_name, llm_call_stats))
+}
+
+#[tokio::main]
+async fn main() -> ExitCode {
+    tracing_subscriber::fmt()
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("warn")),
+        )
+        .with_writer(std::io::stderr)
+        .init();
+
+    let args = Args::parse();
+    let app = AppConfig::from_args(args);
+
+    if atty_stdout() && !app.no_banner {
+        banner::print_banner();
+    }
+
+    match run(app).await {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(e) => {
+            eprintln!("{e}");
+            ExitCode::FAILURE
+        }
+    }
+}
+
+fn atty_stdout() -> bool {
+    // Avoid extra dep: check isatty via libc-free heuristic using stderr for tracing
+    std::io::IsTerminal::is_terminal(&std::io::stdout())
+}
+
+async fn run(app: AppConfig) -> Result<(), settlesure_types::SettleSureError> {
+    if app.generate_only {
+        eprintln!(
+            "Generating synthetic settlement dataset (seed={})...",
+            app.seed
+        );
+        let dataset =
+            generate_and_write_with_opts(app.seed, &app.generate_target_dir(), app.generate_opts())?;
+        eprintln!(
+            "Wrote {} payments, {} settlements, {} bank credits, {} ground-truth labels, {} demo corrections.",
+            dataset.payments.len(),
+            dataset.settlements.len(),
+            dataset.bank_credits.len(),
+            dataset.ground_truth.len(),
+            dataset.demo_corrections.len()
+        );
+        eprintln!("Done (--generate-only).");
+        return Ok(());
+    }
+
+    let corrections = if app.apply_corrections {
+        let loaded = load_corrections_with_fallback(
+            &app.output_dir().join("corrections.json"),
+            &app.data_dir().join("demo_corrections.json"),
+        )?;
+        eprintln!("Loaded {} human correction(s).", loaded.len());
+        loaded
+    } else {
+        Vec::new()
+    };
+
+    if app.runs > 1 {
+        eprintln!(
+            "Running robustness suite: {} seeds starting at {}...",
+            app.runs, app.seed
+        );
+        let mut seeds = Vec::new();
+        let mut match_rates = Vec::new();
+        let mut precisions = Vec::new();
+        let mut recalls = Vec::new();
+        let mut fps = Vec::new();
+        let mut last_full: Option<FullReport> = None;
+
+        for i in 0..app.runs {
+            let s = app.seed + i;
+            seeds.push(s);
+            let corr = if i == 0 { corrections.as_slice() } else { &[] };
+            let (metrics, full, _, _) = run_once(
+                &app,
+                s,
+                app.skip_llm,
+                app.llm_provider,
+                corr,
+            )
+            .await?;
+            match_rates.push(metrics.match_rate);
+            precisions.push(metrics.precision);
+            recalls.push(metrics.recall);
+            fps.push(metrics.false_positive_rate);
+            last_full = Some(full);
+            eprintln!(
+                "  seed {s}: match={:.1}% P={:.1}% R={:.1}% FP={:.1}%",
+                metrics.match_rate * 100.0,
+                metrics.precision * 100.0,
+                metrics.recall * 100.0,
+                metrics.false_positive_rate * 100.0
+            );
+        }
+
+        let mut full = last_full.ok_or_else(|| {
+            settlesure_types::SettleSureError::Message("no robustness runs".into())
+        })?;
+        full.metrics.robustness = Some(RobustnessSummary {
+            seeds,
+            match_rate: mean_min_max(&match_rates),
+            precision: mean_min_max(&precisions),
+            recall: mean_min_max(&recalls),
+            false_positive_rate: mean_min_max(&fps),
+        });
+        let (json_path, md_path, _) = write_report(&full, &app.output_dir())?;
+        copy_report_to_dashboard(&app.root, &json_path);
+        let json_s = json_path.to_string_lossy();
+        let md_s = md_path.to_string_lossy();
+        println!(
+            "{}",
+            format_terminal(
+                &full,
+                Some(ReportPaths {
+                    json_path: Some(json_s.as_ref()),
+                    md_path: Some(md_s.as_ref()),
+                })
+            )
+        );
+        return Ok(());
+    }
+
+    if app.compare_llm {
+        eprintln!("LLM ablation for seed {}...", app.seed);
+        let provider_for_with = if app.llm_provider == Some(LlmProviderChoice::None) {
+            None
+        } else {
+            app.llm_provider
+        };
+        let (with_metrics, mut with_full, with_name, with_call_stats) = run_once(
+            &app,
+            app.seed,
+            false,
+            provider_for_with,
+            &corrections,
+        )
+        .await?;
+        let (without_metrics, _, _, _) = run_once(
+            &app,
+            app.seed,
+            true,
+            Some(LlmProviderChoice::None),
+            &corrections,
+        )
+        .await?;
+
+        let ablation = LlmAblationSummary {
+            provider_available: with_name != "none",
+            with_llm: LlmAblationSide {
+                match_rate: with_metrics.match_rate,
+                precision: with_metrics.precision,
+                recall: with_metrics.recall,
+                false_positive_rate: with_metrics.false_positive_rate,
+                llm_matches: with_metrics.match_source_breakdown.llm,
+                provider: Some(with_name.clone()),
+            },
+            without_llm: LlmAblationSide {
+                match_rate: without_metrics.match_rate,
+                precision: without_metrics.precision,
+                recall: without_metrics.recall,
+                false_positive_rate: without_metrics.false_positive_rate,
+                llm_matches: without_metrics.match_source_breakdown.llm,
+                provider: None,
+            },
+            call_stats: with_call_stats,
+        };
+        with_full.metrics.llm_ablation = Some(ablation.clone());
+        if let Some(ref stats) = ablation.call_stats {
+            eprintln!(
+                "LLM calls: {} (match {} / no_match {} / declined {} / provider errors {}) — latency min {:.0}ms mean {:.0}ms max {:.0}ms",
+                stats.call_count,
+                stats.verdict_match,
+                stats.verdict_no_match,
+                stats.verdict_unsure,
+                stats.provider_errors,
+                stats.latency_ms_min,
+                stats.latency_ms_mean,
+                stats.latency_ms_max,
+            );
+        }
+        if let Some(suggested) = suggest_fuzzy_threshold(&corrections) {
+            with_full.metrics.suggested_fuzzy_threshold = Some(suggested);
+        }
+        let (json_path, md_path, _) = write_report(&with_full, &app.output_dir())?;
+        copy_report_to_dashboard(&app.root, &json_path);
+        let json_s = json_path.to_string_lossy();
+        let md_s = md_path.to_string_lossy();
+        println!(
+            "{}",
+            format_terminal(
+                &with_full,
+                Some(ReportPaths {
+                    json_path: Some(json_s.as_ref()),
+                    md_path: Some(md_s.as_ref()),
+                })
+            )
+        );
+        return Ok(());
+    }
+
+    eprintln!("generating + reconciling (seed={})...", app.seed);
+    let (mut metrics, mut full, _, _) = run_once(
+        &app,
+        app.seed,
+        app.skip_llm,
+        app.llm_provider,
+        &corrections,
+    )
+    .await?;
+
+    if let Some(suggested) = suggest_fuzzy_threshold(&corrections) {
+        metrics.suggested_fuzzy_threshold = Some(suggested);
+        full.metrics.suggested_fuzzy_threshold = Some(suggested);
+        eprintln!(
+            "Suggested fuzzyAcceptThreshold={suggested} (from human accepts in 0.65–0.75; not auto-applied)"
+        );
+    }
+
+    let (json_path, md_path, _) = write_report(&full, &app.output_dir())?;
+    copy_report_to_dashboard(&app.root, &json_path);
+    info!(
+        precision = metrics.precision,
+        recall = metrics.recall,
+        "reconcile complete"
+    );
+    let json_s = json_path.to_string_lossy();
+    let md_s = md_path.to_string_lossy();
+    println!(
+        "{}",
+        format_terminal(
+            &full,
+            Some(ReportPaths {
+                json_path: Some(json_s.as_ref()),
+                md_path: Some(md_s.as_ref()),
+            })
+        )
+    );
+
+    Ok(())
+}

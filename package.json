@@ -3,22 +3,15 @@
   "version": "2.0.0",
   "private": true,
   "type": "module",
-  "description": "Razorpay-style payment gateway settlement reconciliation",
+  "description": "Razorpay-style payment gateway settlement reconciliation (Rust engine)",
   "scripts": {
-    "reconcile": "tsx src/cli.ts",
-    "generate": "tsx src/cli.ts --generate-only",
-    "test": "vitest run",
+    "reconcile": "cargo run -q -p settlesure-cli --",
+    "generate": "cargo run -q -p settlesure-cli -- --generate-only",
+    "test": "cargo test --workspace",
     "dashboard": "npm run dev --prefix dashboard",
     "check-baseline": "node scripts/check-baseline.mjs",
-    "sweep-decoys": "tsx scripts/sweep-decoys.ts"
-  },
-  "dependencies": {
-    "@anthropic-ai/sdk": "^0.39.0"
-  },
-  "devDependencies": {
-    "@types/node": "^22.13.10",
-    "tsx": "^4.19.3",
-    "typescript": "^5.8.2",
-    "vitest": "^3.0.8"
+    "bench-throughput": "node scripts/bench-throughput.mjs --runs 5 --scales 1,10,50",
+    "sweep-decoys": "RUN_SWEEP=1 cargo test -p settlesure-integration write_decoy_sweep -- --nocapture",
+    "clippy": "cargo clippy --all-targets --all-features -- -D warnings"
   }
 }

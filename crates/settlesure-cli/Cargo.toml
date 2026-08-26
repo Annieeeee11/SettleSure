@@ -1,0 +1,29 @@
+[package]
+name = "settlesure-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "SettleSure CLI — orchestration only"
+
+[[bin]]
+name = "settlesure"
+path = "src/main.rs"
+
+[[example]]
+name = "bench_deterministic"
+path = "examples/bench_deterministic.rs"
+
+[dependencies]
+settlesure-types = { workspace = true }
+settlesure-data = { workspace = true }
+settlesure-engine = { workspace = true }
+settlesure-scoring = { workspace = true }
+settlesure-llm = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+clap = { workspace = true }
+tokio = { workspace = true }
+chrono = { workspace = true }

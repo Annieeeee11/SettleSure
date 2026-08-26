@@ -7,5 +7,7 @@ output/*
 node_modules/
 dashboard/node_modules/
 dist/
+target/
+benchmarks/fixtures/
 .env
 *.log

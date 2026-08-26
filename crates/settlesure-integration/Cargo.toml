@@ -1,0 +1,16 @@
+[package]
+name = "settlesure-integration"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+description = "Workspace-level integration and property tests"
+
+[dependencies]
+settlesure-types = { workspace = true }
+settlesure-data = { workspace = true }
+settlesure-engine = { workspace = true }
+settlesure-scoring = { workspace = true }
+
+[dev-dependencies]
+proptest = { workspace = true }

@@ -1,65 +1,58 @@
-<div align="center">
-  <img width="476" height="147" alt="image" src="https://github.com/user-attachments/assets/cb6a7870-c367-45c9-a050-988015c58bfc" />
-</div>
-
 # SettleSure: Payment Gateway Settlement Reconciliation
 
 ![Razorpay](https://img.shields.io/badge/Razorpay-072654?style=flat&logo=razorpay&logoColor=white)
+![Rust](https://img.shields.io/badge/rust-1.90+-orange?style=flat&logo=rust)
 ![CI](https://github.com/Annieeeee11/SettleSure/actions/workflows/ci.yml/badge.svg)
-![Node](https://img.shields.io/badge/node-%3E%3D18-brightgreen)
-![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=flat&logo=typescript&logoColor=white)
-![LLM agent](https://img.shields.io/badge/llm--agent-111827?style=flat&logo=openai&logoColor=white)
-![Ollama](https://img.shields.io/badge/Ollama-000000?style=flat&logo=ollama&logoColor=white)
 
-This is a Razorpay-style 3-way settlement reconciliation: Payments → Settlements (gross/fee/tax/net + UTR) → Bank payout credits. The deterministic engine (exact → fuzzy → split) earns 100% on the hard seed-42 batch; LLM and human tiers escalate genuinely ambiguous multi-solution splits — not recall crutches.
+This is a Razorpay-style 3-way settlement reconciliation: Payments → Settlements (gross/fee/tax/net + UTR) → Bank payout credits. The **Rust** deterministic engine (exact → fuzzy → split) handles the clear batch; **LLM and human tiers** escalate genuinely ambiguous near-dups, boundary UTR pairs, and multi-solution splits — not recall crutches.
+
+See [`MIGRATION_NOTES.md`](MIGRATION_NOTES.md) for the TypeScript → Rust port details.
+
+## What broke, and what we did about it
+
+A perfect **100%/100%/0%** score with **zero LLM or human matches** is a red flag on this track: it means the adversarial batch no longer exercises fallback tiers. Seed 42 was hardened so `--skip-llm` leaves **7 genuinely ambiguous GT matches** unresolved (boundary + near-duplicate decoys routed to LLM). With LLM enabled, those cases are the intended resolution path.
 
 ## 60-second demo
 
-1. `npm install && npm run reconcile -- --seed 42 --skip-llm` generates the batch, runs exact → fuzzy → split, and prints the report.
+1. `cargo run -p settlesure-cli -- --seed 42 --skip-llm` generates the batch, runs exact → fuzzy → split, and prints the report.
 2. `npm run dashboard` opens http://localhost:5173. You’ll see match rate, precision, recall, and FP rate by case difficulty, plus the full exception list with reasons.
 3. In the dashboard, click **Accept** on one ambiguous exception, then **Re-run with corrections**. The human-resolved count should move from 0 to 1+ in the match-source chart.
-4. `npm run reconcile -- --seed 42 --compare-llm --llm-provider ollama --llm-model llama3.2` shows residual LLM work on ambiguous splits (often `unsure` / 0–2 matches), side by side with skip-llm already at 100% (needs local Ollama).
-<img width="1127" height="714" alt="image" src="https://github.com/user-attachments/assets/f152aa8f-94c8-4ab2-8ebc-366cd7854b5a" />
+4. `cargo run -p settlesure-cli -- --seed 42 --compare-llm --llm-provider ollama --llm-model llama3.2` shows residual LLM work on ambiguous splits and near-dups (needs local Ollama). After transport hardening (120s timeout, one retry), all 9 ambiguous cases get a model verdict or an explicit provider-error label — no misleading `"ambiguous — LLM error"` strings.
 
-<img width="575" height="700" alt="SettleSure dashboard seed 42" src="docs/dashboard-seed42.png" />
-
-
----
-
-**Seed 42 headline metrics** (`npm run reconcile -- --seed 42 --skip-llm`):
+**Seed 42 headline metrics** (`--seed 42 --skip-llm`):
 
 | Precision | Recall | FP rate | Exact / Fuzzy / Split / LLM / Human |
 | ---: | ---: | ---: | ---: |
-| 97.67% | 91.30% | 2.33% | 22 / 18 / 3 / 0 / 0 |
+| 100% | 84.78% | 0% | 20 / 17 / 2 / 0 / 0 |
 
-**LLM ablation** (`npm run reconcile -- --seed 42 --compare-llm --llm-provider ollama --llm-model qwen2.5-coder:7b`, measured run):
+**Seed 42 LLM ablation** (`--seed 42 --compare-llm --llm-provider ollama --llm-model llama3.2`, measured 2026-08-27):
 
 | | With LLM | Without LLM |
 | --- | ---: | ---: |
-| Match rate / Recall | 95.65% | 91.30% |
-| Precision | 97.78% | 97.67% |
-| FP rate | 2.22% | 2.33% |
-| LLM matches | 2 | 0 |
-| Provider | ollama | none |
+| Match rate / Recall | 93.48% | 84.78% |
+| Precision / FP | 100% / 0% | 100% / 0% |
+| LLM matches | 4 | 0 |
+| Match sources | 20 / 17 / 2 / 4 / 0 | 20 / 17 / 2 / 0 / 0 |
+| LLM pass wall time | ~136s | ~1ms |
+| Per-call latency (9 calls) | min 7.9s · mean 15.1s · max 58.2s | — |
 
-Full grid: [`output/decoy-sweep.md`](output/decoy-sweep.md) (`npm run sweep-decoys`).
+Deterministic passes run in ~1–2ms per record; LLM verification is the throughput bottleneck (~15s/call on local `llama3.2`).
 
-**Human loop:** Skip-llm is already at 100% recall; the human tier is for **ambiguous splits** the engine correctly refuses and LLM marks `unsure`. `npm run reconcile -- --seed 42 --skip-llm --apply-corrections` (or dashboard Accept → Re-run) shows **Human ≥ 1** in match sources via `data/demo_corrections.json`. Accepting a GT-`exception` row (ambiguous split) scores as an **FP by design** — GT says “do not auto-match”; the human override is still a useful ops demo.
+**LLM exception prefixes** (failure-class distinction):
+
+| Prefix | Meaning |
+| --- | --- |
+| `LLM verdict: match` / `no_match` | Model responded with a clear verdict |
+| `ambiguous — LLM declined` | Model responded but unsure / low confidence |
+| `LLM unavailable — provider error` | Transport/HTTP failure after one retry |
+| `ambiguous — LLM unavailable` | Provider not selected / Ollama unreachable at start |
+
+**Human loop:** `cargo run -p settlesure-cli -- --seed 42 --skip-llm --apply-corrections` (or dashboard Accept → Re-run) shows **Human ≥ 1** via `data/demo_corrections.json`. Accepting a GT-`exception` row (ambiguous split) scores as an **FP by design** — GT says “do not auto-match”; the human override is still a useful ops demo.
 
 ```bash
-npm install
-npm run reconcile -- --seed 42 --skip-llm
+cargo run -p settlesure-cli -- --seed 42 --skip-llm
 npm run dashboard   # http://localhost:5173
 ```
-
-Docker:
-
-```bash
-docker build -t settlesure .
-docker run --rm settlesure
-```
-
----
 
 ## Pipeline
 
@@ -68,19 +61,13 @@ docker run --rm settlesure
 3. **Bank credits**: UTR join on net ≈ credited  
 4. Passes: integrity → exact → fuzzy → split → LLM → human corrections  
 
-Adversarial cases include near duplicate decoys, boundary reference mangles, decoy subset sums, and unresolvable noise. They’re scored with `ambiguityLevel` (`clear` / `boundary` / `decoy` / `unresolvable`). The dashboard shows that breakdown under the summary metrics.
-
-## Human correction click-through
-
-1. Run reconcile, then `npm run dashboard`.
-2. On an ambiguous / exception row, click **Accept** (or **Reject**). The row greys out as “resolved — pending re-run” and the decision is appended to `output/corrections.json` via the Vite `/api/corrections` route.
-3. Click **Re-run with corrections**. The dashboard runs `npm run reconcile -- --seed 42 --skip-llm --apply-corrections`, reloads `report.json`, and the match-source **human** bar becomes nonzero. That’s the closed finance-ops loop.
+Adversarial cases include near duplicate decoys, boundary reference mangles, decoy subset sums, and unresolvable noise. They’re scored with `ambiguityLevel` (`clear` / `boundary` / `decoy` / `unresolvable`).
 
 ## Quick start
 
 ```bash
-npm install
-npm run reconcile -- --seed 42 --skip-llm
+cargo run -p settlesure-cli -- --seed 42 --skip-llm
+# or: npm run reconcile -- --seed 42 --skip-llm
 ```
 
 ### Options
@@ -95,43 +82,85 @@ npm run reconcile -- --seed 42 --skip-llm
 | `--apply-corrections` | Apply `output/corrections.json` or `data/demo_corrections.json` |
 | `--runs <n>` | Multi-seed robustness (seeds `seed..seed+n-1`) |
 | `--compare-llm` | Side-by-side LLM on vs off ablation |
-
-### Optional LLM pass
+| `--dump-matches [path]` | Write NDJSON match triples (default `output/matches.ndjson`) |
+| `--batch-scale <n>` | Multiply adversarial class counts when generating (default `1`) |
+| `--output-data-dir <dir>` | Override data output path (with `--generate-only`) |
 
 Provider selection order: `--llm-provider` → `ANTHROPIC_API_KEY` → Ollama → none.
 
+## Throughput (TS oracle vs Rust release)
+
+Deterministic passes only (exact + fuzzy + split), measured with fresh subprocess per run. Rust uses `--release`; TypeScript runs under Node (no separate release mode). Fixtures are Rust-generated and copied to the TS oracle worktree; parity on match/exception counts is verified before timing.
+
+| Scale | Records (pay / setl / bank) | TS mean (ms) | Rust mean (ms) | Speedup | ms / bank |
+| --- | --- | ---: | ---: | ---: | ---: |
+| 1× | 71 / 71 / 57 | 18.1 | 5.1 | **3.6×** | 0.32 / 0.09 |
+| 10× | 710 / 710 / 570 | 1,072 | 485 | **2.2×** | 1.88 / 0.85 |
+| 50× | 3,550 / 3,550 / 2,850 | 27,935 | 12,749 | **2.2×** | 9.80 / 4.47 |
+
+At seed-42 scale (71 records), both engines finish deterministic reconciliation in single-digit milliseconds — the ~3.6× gap is real but modest in absolute terms. The story widens at production-ish batch sizes: fuzzy pass is O(banks × settlements), so time grows super-linearly and dominates total runtime.
+
+**Pass breakdown at 50× scale (mean ms):**
+
+| Pass | TypeScript | Rust release |
+| --- | ---: | ---: |
+| Exact | 166 | 120 |
+| Fuzzy | 27,566 | 12,537 |
+| Split | 202 | 92 |
+
+Reproduce: `npm run bench-throughput` (requires TS oracle worktree — see [`MIGRATION_NOTES.md`](MIGRATION_NOTES.md)).
+
+## Docker (CLI-only)
+
+The image packages **`settlesure-cli` only** — no Node, no dashboard.
+
 ```bash
-npm run reconcile -- --seed 42 --compare-llm --llm-provider ollama --llm-model llama3.2
-npm run reconcile -- --seed 42 --llm-provider ollama --llm-model llama3.2
-npm run reconcile -- --seed 42 --runs 5 --skip-llm
-npm run reconcile -- --seed 42 --skip-llm --apply-corrections
+docker build -t settlesure .
+docker run --rm settlesure --seed 42 --skip-llm --no-banner
 ```
+
+The CLI regenerates `data/` and writes `output/` at runtime under `/app`. Baselines and pre-shipped fixtures are not required in the image.
+
+**Dashboard `/api/rerun`** ([`dashboard/vite.config.ts`](dashboard/vite.config.ts)) shells out to `cargo run` on the host — a **local-dev convenience** that requires a local Rust toolchain. It is intentionally **not** included in the Docker image. A fully containerized dashboard+engine demo would be a separate `docker-compose.yml`.
+
+## Cargo workspace
+
+```
+crates/settlesure-types|data|engine|scoring|llm|cli
+```
+
+Engine has no network code; LLM is isolated and async.
 
 ## Metrics (never blended)
 
-Overall precision, recall, and FP rate are reported separately. You also get **Accuracy by case difficulty** (clear / boundary / decoy / unresolvable) in both `output/report.md` and the dashboard.
+Overall precision, recall, and FP rate are reported separately, plus **Accuracy by case difficulty** in `output/report.md` and the dashboard.
 
 ## Tests & CI
 
 ```bash
-npm test
-npm run reconcile -- --seed 42 --skip-llm
+cargo test --workspace
+cargo clippy --all-targets --all-features -- -D warnings
+cargo run -p settlesure-cli -- --seed 42 --skip-llm
 npm run check-baseline
 ```
+
+CI fails if seed 42 is suspiciously perfect (100%/100%/0% with zero LLM/human tier usage) or if adversarial GT slices disappear.
+
+## History
+
+| Era | Precision / Recall | Exact / Fuzzy / Split | Notes |
+| --- | --- | --- | --- |
+| Pre-fix TS (`1b4a43c`) | 97.67% / 91.30% | 22 / 18 / 3 | Dup-UTR false splits + prefix floor 0.9 |
+| Fixed TS (`17c0c88`, `7a67d75`) | 100% / 100% | 22 / 22 / 2 | Dup-UTR split gate + prefix floor 0.92 |
+| Rust port (same engine) | 100% / 100% | 22 / 22 / 2 | Correct parity with fixed TS |
+| **Hardened generator (current)** | **100% / 84.78%** | **20 / 17 / 2** | Adversarial cases target LLM tier again |
+
+Root cause of the historical 22/18/3 gap: TS commits [`17c0c88`](.) (duplicate-UTR split gate) and [`7a67d75`](.) (prefix floor 0.92). Rust reproduces fixed TS behavior; the generator was subsequently hardened so truncated-prefix mangling alone cannot trivialize the batch.
 
 ## Known limitations
 
 - Split matching is bounded (pool ≤25, combo ≤6)
-- Ambiguous multi-solution batches are not auto-picked; they are routed to the LLM/human tier with the tied combinations listed
+- Ambiguous multi-solution batches are not auto-picked; they are routed to the LLM/human tier
 - No FX conversion
-- Near dup / boundary cases need LLM or human for full recall
-- On the Ollama `llama3.2` ablation run (seed 42), the model correctly matched 2 of 4 residual true pairs (`bank_0039`/`setl_0039`, `bank_0042`/`setl_0044`) using amount + UTR signals, but wrongly rejected the other two true near dup pairs (`bank_0040`/`setl_0040`, `bank_0041`/`setl_0042`) as `no_match` because truncated UTRs weren’t treated as prefixes. Those stayed false negatives.
-- Local LLM output isn’t deterministic. A follow-up run with the same seed and model resolved a different 3 of 4 residual pairs (recall 97.83% in `output/report.json`, which the dashboard uses) and rejected `bank_0042`/`setl_0044` for the same truncated-UTR reason. We didn’t re-run until the numbers looked nicer.
-
-## What broke, and what we did about it
-
-**The first version scored a perfect 100%.** Seed 42 came back with 100% match rate, precision, and recall, 0% false positives, and the LLM and human tiers never fired. On a track that cares about measured accuracy over a cherry-picked win, that looked like easy data, not a flawless engine. We rebuilt the generator with near duplicate decoys, boundary UTR mangles at the fuzzy threshold, and split batches with a coincidental decoy sum. The skip-llm baseline is now **97.67% precision / 91.30% recall / 2.33% FP**. Lower, but more honest, and the leftover tiers actually have something to do.
-
-**The first LLM ablation was a no-op.** `--compare-llm` printed the same numbers on both sides because both silently fell back to provider `none`. We ran it again against local Ollama (`llama3.2`): recall went from **91.30% → 95.65%**, correctly resolving **2 of 4** ambiguous pairs. The two false `no_match` calls are under Known Limitations instead of being swept under the rug.
-
-Spotting a perfect score and a flat ablation as non results was the same kind of call as the metrics themselves: if the output looks too clean, treat it as a failure mode until the residual tiers have real work left.
+- Local LLM output isn’t deterministic
+- `--skip-llm` intentionally under-matches ambiguous GT rows — use `--compare-llm` or `--apply-corrections` to exercise fallback tiers

@@ -81,8 +81,19 @@ function correctionsPlugin(): Plugin {
             return;
           }
           const child = spawn(
-            "npm",
-            ["run", "reconcile", "--", "--seed", "42", "--skip-llm", "--apply-corrections"],
+            "cargo",
+            [
+              "run",
+              "-q",
+              "-p",
+              "settlesure-cli",
+              "--",
+              "--seed",
+              "42",
+              "--skip-llm",
+              "--apply-corrections",
+              "--no-banner",
+            ],
             { cwd: root, shell: true },
           );
           let stderr = "";

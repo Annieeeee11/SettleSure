@@ -1,0 +1,16 @@
+[package]
+name = "settlesure-data"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Deterministic seeded synthetic dataset generation"
+
+[dependencies]
+settlesure-types = { workspace = true }
+# UTR mangling reuses engine referenceSimilarity (same as TS generate→fuzzyMatch)
+settlesure-engine = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+chrono = { workspace = true }
+tracing = { workspace = true }
