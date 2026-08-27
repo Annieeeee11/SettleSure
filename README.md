@@ -12,7 +12,7 @@
 | ---: | ---: | ---: | ---: |
 | 100% | 85.71% | 0% | 23 / 17 / 2 / 0 / 0 |
 
-> **LLM lift is model-dependent.** An arbitrary local Ollama model may show **zero recall gain**. Re-measure with `npm run ablation-models` before claiming LLM numbers.
+> **LLM lift is model-dependent.** An arbitrary local Ollama model may show **zero recall gain**. Re-measure manually per model (see [BYOK](#byok-bring-your-own-key) below); `npm run ablation-models-help` prints an example command only — it does not run ablations.
 
 **Model sensitivity (seed 42, `--compare-llm`, measured 2026-08-27):**
 
@@ -23,7 +23,7 @@
 | llama3.2 | 93.48%† | 4 | 4 / 0 / 5 |
 | qwen2.5-coder:7b | 100.00% | 7 | 7 / 0 / 2 |
 
-† `llama3.2` ablation used pre–accept-band-bait batch layout (84.78% skip-llm baseline); re-run `npm run ablation-models` after generator changes.
+† `llama3.2` ablation used pre–accept-band-bait batch layout (84.78% skip-llm baseline); re-measure manually after generator changes (see BYOK section).
 
 **Anthropic:** transport/error handling is unit-tested; **live ablation not run by default**. Optional: `npm run ablation-anthropic` when `ANTHROPIC_API_KEY` is set (uses `claude-3-5-haiku-latest`).
 
@@ -94,8 +94,9 @@ npm run dashboard   # http://localhost:5173
 | `--seed <n>` | Reproducible batch (default `42`) |
 | `--generate-only` | Write data files and exit |
 | `--skip-llm` | Force no LLM |
-| `--llm-provider <…>` | `anthropic` \| `ollama` \| `none` |
-| `--llm-model <name>` | Ollama model (default `llama3.2`) |
+| `--llm-provider <…>` | `anthropic` \| `openai` \| `ollama` \| `none` |
+| `--llm-model <name>` | Model name (Ollama default `llama3.2`; OpenAI default `gpt-4o-mini`) |
+| `--llm-base-url <url>` | OpenAI-compatible API root (default `https://api.openai.com/v1`) |
 | `--apply-corrections` | Apply `output/corrections.json` or `data/demo_corrections.json` |
 | `--runs <n>` | Multi-seed robustness (seeds `seed..seed+n-1`); combine with `--compare-llm` for multi-seed LLM ablation |
 | `--compare-llm` | Side-by-side LLM on vs off ablation (works with `--runs`) |
@@ -104,7 +105,25 @@ npm run dashboard   # http://localhost:5173
 | `--batch-scale <n>` | Multiply adversarial class counts when generating (default `1`) |
 | `--output-data-dir <dir>` | Override data output path (with `--generate-only`) |
 
-Provider selection order: `--llm-provider` → `ANTHROPIC_API_KEY` → Ollama → none.
+Provider selection order: `--llm-provider` → `ANTHROPIC_API_KEY` → `OPENAI_API_KEY` → Ollama → none.
+
+### BYOK (bring your own key)
+
+OpenAI-compatible endpoints share one provider (`--llm-provider openai`) with `OPENAI_API_KEY`:
+
+| Provider | Env | `--llm-base-url` (optional) | Example `--llm-model` |
+| --- | --- | --- | --- |
+| OpenAI | `OPENAI_API_KEY` | (default) | `gpt-4o-mini` |
+| Groq | `OPENAI_API_KEY` | `https://api.groq.com/openai/v1` | `llama-3.1-8b-instant` |
+| OpenRouter | `OPENAI_API_KEY` | `https://openrouter.ai/api/v1` | `openai/gpt-4o-mini` |
+
+```bash
+OPENAI_API_KEY=... cargo run --release -p settlesure-cli -- --seed 42 --compare-llm \
+  --llm-provider openai --llm-model gpt-4o-mini --no-banner
+# or: npm run ablation-openai
+```
+
+Missing `OPENAI_API_KEY` with `--llm-provider openai` falls back to `LLM: none` with a WARN log; ambiguous cases get `ambiguous — LLM unavailable` (same as Anthropic without a key). Anthropic: `npm run ablation-anthropic` when `ANTHROPIC_API_KEY` is set.
 
 ## Throughput (historical / comparative — TS oracle vs Rust release)
 
@@ -137,9 +156,12 @@ The image packages **`settlesure-cli` only** (~160 MB) — no Node, no dashboard
 ```bash
 docker build -t settlesure .
 docker run --rm settlesure --seed 42 --skip-llm --no-banner
-# Dashboard + engine (mounts output/report.json):
-docker compose up dashboard
+# Dashboard + engine (run engine first — it writes output/report.json):
+docker compose up engine
+docker compose up dashboard   # then open http://localhost:5173
 ```
+
+First boot: run **`engine` before `dashboard`** so `output/report.json` exists. Dashboard skips `npm ci` when `node_modules` is already present.
 
 **Verified output** (2026-08-27, `docker build` + `docker run` on Colima/arm64):
 
@@ -199,6 +221,6 @@ Root cause of the historical 22/18/3 gap: TS commits [`17c0c88`](.) (duplicate-U
 - Ambiguous multi-solution batches are not auto-picked; they are routed to the LLM/human tier
 - No FX conversion
 - Ollama uses `temperature: 0` + fixed seed + JSON schema `format`; residual nondeterminism may remain (model/hardware)
-- Anthropic live ablation not verified by default — use `npm run ablation-anthropic` with API key
+- Anthropic / OpenAI live ablation not verified by default — use `npm run ablation-anthropic` or `npm run ablation-openai` with API keys
 - `--skip-llm` intentionally under-matches ambiguous GT rows — use `--compare-llm` (native/Ollama on host) or `--apply-corrections` to exercise fallback tiers
 - Docker image is CLI-only; Ollama/LLM ablation requires host-side provider access

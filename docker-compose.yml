@@ -12,9 +12,14 @@ services:
     working_dir: /app/dashboard
     volumes:
       - ./dashboard:/app/dashboard
-      - ./output/report.json:/app/dashboard/public/report.json
+      - ./output:/app/output:ro
     ports:
       - "5173:5173"
-    command: ["sh", "-c", "npm ci && npm run dev -- --host 0.0.0.0"]
+    command:
+      [
+        "sh",
+        "-c",
+        "test -d node_modules || npm ci --prefer-offline --no-audit; cp -f ../output/report.json public/report.json 2>/dev/null || true; npm run dev -- --host 0.0.0.0",
+      ]
     depends_on:
       - engine

@@ -20,6 +20,7 @@
 use crate::anthropic::AnthropicProvider;
 use crate::cache::{candidate_label, VerdictCache};
 use crate::ollama::{is_ollama_reachable, OllamaProvider};
+use crate::openai_compat::OpenAiCompatProvider;
 use crate::provider::{resolve_with_retry_timed, LlmCallResult, LlmProvider, VerdictKind};
 use settlesure_types::{
     AmbiguousCandidate, AmbiguousKind, DiscrepancyClass, Exception, ExceptionSource, LlmCallStats,
@@ -45,6 +46,8 @@ pub struct LlmSelectOptions {
     pub llm_model: Option<String>,
     pub seed: u32,
     pub anthropic_api_key: Option<Secret<String>>,
+    pub openai_api_key: Option<Secret<String>>,
+    pub llm_base_url: Option<String>,
     pub llm_cache: bool,
     pub llm_cache_path: Option<PathBuf>,
 }
@@ -143,6 +146,18 @@ impl CallStatsAccumulator {
     }
 }
 
+fn openai_model_name(options: &LlmSelectOptions) -> String {
+    let raw = options
+        .llm_model
+        .clone()
+        .unwrap_or_else(|| "gpt-4o-mini".into());
+    if raw == "llama3.2" {
+        "gpt-4o-mini".into()
+    } else {
+        raw
+    }
+}
+
 pub async fn select_llm_provider(options: &LlmSelectOptions) -> SelectedLlm {
     if options.skip_llm || options.llm_provider == Some(LlmProviderChoice::None) {
         return SelectedLlm {
@@ -167,6 +182,24 @@ pub async fn select_llm_provider(options: &LlmSelectOptions) -> SelectedLlm {
         };
     }
 
+    if options.llm_provider == Some(LlmProviderChoice::OpenAi) {
+        let Some(ref key) = options.openai_api_key else {
+            warn!("Requested openai provider but OPENAI_API_KEY missing.");
+            return SelectedLlm {
+                provider: None,
+                name: "none".into(),
+            };
+        };
+        return SelectedLlm {
+            provider: Some(Box::new(OpenAiCompatProvider::new(
+                key.clone(),
+                Some(openai_model_name(options)),
+                options.llm_base_url.clone(),
+            ))),
+            name: "openai".into(),
+        };
+    }
+
     if options.llm_provider == Some(LlmProviderChoice::Ollama) {
         if !is_ollama_reachable(None, None).await {
             warn!("Requested ollama provider but localhost:11434 unreachable.");
@@ -185,11 +218,21 @@ pub async fn select_llm_provider(options: &LlmSelectOptions) -> SelectedLlm {
         };
     }
 
-    // Auto-select: Anthropic key > Ollama reachable > none
+    // Auto-select: Anthropic key > OpenAI key > Ollama reachable > none
     if let Some(ref key) = options.anthropic_api_key {
         return SelectedLlm {
             provider: Some(Box::new(AnthropicProvider::new(key.clone()))),
             name: "anthropic".into(),
+        };
+    }
+    if let Some(ref key) = options.openai_api_key {
+        return SelectedLlm {
+            provider: Some(Box::new(OpenAiCompatProvider::new(
+                key.clone(),
+                Some(openai_model_name(options)),
+                options.llm_base_url.clone(),
+            ))),
+            name: "openai".into(),
         };
     }
     if is_ollama_reachable(None, None).await {

@@ -126,6 +126,137 @@ struct Scored {
 
 type BucketKey = (String, i64, i64);
 
+type PairKey = (String, String);
+
+const MIN_REF_SIMILARITY: f64 = 0.65;
+
+fn pair_key(bank: &BankCredit, settlement: &Settlement) -> PairKey {
+    (bank.id.clone(), settlement.settlement_id.clone())
+}
+
+fn is_cross_currency_mismatch_pair(bank: &BankCredit, settlement: &Settlement) -> bool {
+    bank.currency != settlement.currency
+        && bank.utr == settlement.utr
+        && bank.credited_at == settlement.settled_at
+        && bank.credited_amount == settlement.net_amount
+}
+
+fn push_candidate_if_eligible(
+    candidates: &mut Vec<Scored>,
+    bank: &BankCredit,
+    settlement: &Settlement,
+    config: &ReconcileConfig,
+) {
+    if is_cross_currency_mismatch_pair(bank, settlement) {
+        candidates.push(Scored {
+            bank: bank.clone(),
+            settlement: settlement.clone(),
+            score: 0.0,
+            reason: "currency mismatch, not auto-resolved".into(),
+            currency_mismatch: true,
+        });
+        return;
+    }
+
+    let (score, reason, currency_mismatch) = score_pair(bank, settlement, config);
+    if currency_mismatch {
+        return;
+    }
+
+    let ref_sim = reference_similarity(&bank.utr, &settlement.utr);
+    if ref_sim < MIN_REF_SIMILARITY {
+        return;
+    }
+
+    if score >= config.ambiguous_low {
+        candidates.push(Scored {
+            bank: bank.clone(),
+            settlement: settlement.clone(),
+            score,
+            reason,
+            currency_mismatch: false,
+        });
+    }
+}
+
+fn collect_scored_candidates_brute(
+    bank_pool: &[BankCredit],
+    settlement_pool: &[Settlement],
+    config: &ReconcileConfig,
+) -> Vec<Scored> {
+    let mut candidates = Vec::new();
+    for bank in bank_pool {
+        for settlement in settlement_pool {
+            push_candidate_if_eligible(&mut candidates, bank, settlement, config);
+        }
+    }
+    candidates
+}
+
+fn collect_scored_candidates_bucketed(
+    bank_pool: &[BankCredit],
+    settlement_pool: &[Settlement],
+    config: &ReconcileConfig,
+) -> Vec<Scored> {
+    let mut candidates = Vec::new();
+    let settlement_index = build_settlement_index(settlement_pool, config);
+
+    for bank in bank_pool {
+        let settlement_indices = candidate_settlement_indices(bank, &settlement_index, config);
+        for idx in settlement_indices {
+            push_candidate_if_eligible(
+                &mut candidates,
+                bank,
+                &settlement_pool[idx],
+                config,
+            );
+        }
+    }
+
+    // Cross-currency pairs are not in the same currency bucket.
+    for bank in bank_pool {
+        for settlement in settlement_pool {
+            if is_cross_currency_mismatch_pair(bank, settlement) {
+                candidates.push(Scored {
+                    bank: bank.clone(),
+                    settlement: settlement.clone(),
+                    score: 0.0,
+                    reason: "currency mismatch, not auto-resolved".into(),
+                    currency_mismatch: true,
+                });
+            }
+        }
+    }
+
+    candidates
+}
+
+/// Pre-greedy candidate pair keys — brute O(banks × settlements). Test-only parity oracle.
+#[doc(hidden)]
+pub fn fuzzy_candidate_pair_keys_brute(
+    bank_pool: &[BankCredit],
+    settlement_pool: &[Settlement],
+    config: &ReconcileConfig,
+) -> HashSet<PairKey> {
+    collect_scored_candidates_brute(bank_pool, settlement_pool, config)
+        .iter()
+        .map(|c| pair_key(&c.bank, &c.settlement))
+        .collect()
+}
+
+/// Pre-greedy candidate pair keys — bucketed pre-filter (production path).
+#[doc(hidden)]
+pub fn fuzzy_candidate_pair_keys_bucketed(
+    bank_pool: &[BankCredit],
+    settlement_pool: &[Settlement],
+    config: &ReconcileConfig,
+) -> HashSet<PairKey> {
+    collect_scored_candidates_bucketed(bank_pool, settlement_pool, config)
+        .iter()
+        .map(|c| pair_key(&c.bank, &c.settlement))
+        .collect()
+}
+
 fn amount_bucket(amount: f64, config: &ReconcileConfig) -> i64 {
     let width = amount_tolerance(amount, config).max(0.01);
     (amount / width).floor() as i64
@@ -191,69 +322,8 @@ pub fn fuzzy_match(
     let mut used_settlement: HashSet<String> = HashSet::new();
     let mut resolved_bank: HashSet<String> = HashSet::new();
 
-    let mut candidates: Vec<Scored> = Vec::new();
-    let min_ref_similarity = 0.65;
-    let settlement_index = build_settlement_index(settlement_pool, config);
-
-    for bank in bank_pool {
-        let settlement_indices = candidate_settlement_indices(bank, &settlement_index, config);
-        for idx in settlement_indices {
-            let settlement = &settlement_pool[idx];
-            if bank.currency != settlement.currency
-                && bank.utr == settlement.utr
-                && bank.credited_at == settlement.settled_at
-                && bank.credited_amount == settlement.net_amount
-            {
-                candidates.push(Scored {
-                    bank: bank.clone(),
-                    settlement: settlement.clone(),
-                    score: 0.0,
-                    reason: "currency mismatch, not auto-resolved".into(),
-                    currency_mismatch: true,
-                });
-                continue;
-            }
-
-            let (score, reason, currency_mismatch) = score_pair(bank, settlement, config);
-            if currency_mismatch {
-                continue;
-            }
-
-            let ref_sim = reference_similarity(&bank.utr, &settlement.utr);
-            if ref_sim < min_ref_similarity {
-                continue;
-            }
-
-            if score >= config.ambiguous_low {
-                candidates.push(Scored {
-                    bank: bank.clone(),
-                    settlement: settlement.clone(),
-                    score,
-                    reason,
-                    currency_mismatch: false,
-                });
-            }
-        }
-    }
-
-    // Cross-currency pairs with identical UTR/date/amount (not in same currency bucket).
-    for bank in bank_pool {
-        for settlement in settlement_pool {
-            if bank.currency != settlement.currency
-                && bank.utr == settlement.utr
-                && bank.credited_at == settlement.settled_at
-                && bank.credited_amount == settlement.net_amount
-            {
-                candidates.push(Scored {
-                    bank: bank.clone(),
-                    settlement: settlement.clone(),
-                    score: 0.0,
-                    reason: "currency mismatch, not auto-resolved".into(),
-                    currency_mismatch: true,
-                });
-            }
-        }
-    }
+    let mut candidates =
+        collect_scored_candidates_bucketed(bank_pool, settlement_pool, config);
 
     candidates.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
 

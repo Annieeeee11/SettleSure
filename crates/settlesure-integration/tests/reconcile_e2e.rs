@@ -49,6 +49,7 @@ fn seed42_skip_llm_meets_baseline_gates() {
     assert_eq!(metrics.match_source_breakdown.split, 2);
     assert_eq!(metrics.match_source_breakdown.llm, 0);
     assert_eq!(metrics.match_source_breakdown.human, 0);
+    // Fuzzy bucket pre-filter parity: see fuzzy_bucket_parity.rs
 }
 
 #[test]

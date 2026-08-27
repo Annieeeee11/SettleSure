@@ -14,8 +14,9 @@ LLM pass: disabled / unavailable
 | Recall | 85.71% |
 | False positive rate | 0.00% |
 | Exception accuracy | 71.43% |
-| Throughput | 1500.91 records/sec |
-| Runtime (total) | 91.28 ms |
+_Exception accuracy = correctly flagged ÷ predicted exceptions (precision on exceptions, not recall). Under `--skip-llm`, unresolved ambiguous GT matches inflate predicted exceptions (`ambiguous — LLM unavailable`), lowering this metric by design; with LLM enabled those cases resolve to matches._
+| Throughput | 94678.65 records/sec |
+| Runtime (total) | 1.45 ms |
 
 ### Counts
 
@@ -40,11 +41,11 @@ LLM pass: disabled / unavailable
 
 | Pass timing | ms |
 | --- | ---: |
-| Exact | 1.07 |
-| Fuzzy | 87.88 |
-| Split | 0.35 |
-| LLM | 0.63 |
-| Total | 91.28 |
+| Exact | 0.10 |
+| Fuzzy | 0.70 |
+| Split | 0.09 |
+| LLM | 0.12 |
+| Total | 1.45 |
 
 ## Accuracy by case difficulty
 

@@ -44,13 +44,17 @@ struct Args {
     #[arg(long)]
     skip_llm: bool,
 
-    /// LLM provider: anthropic | ollama | none
+    /// LLM provider: anthropic | openai | ollama | none
     #[arg(long, value_parser = parse_provider)]
     llm_provider: Option<LlmProviderChoice>,
 
-    /// Ollama model (default: llama3.2)
+    /// Ollama / OpenAI-compatible model name (Ollama default: llama3.2; OpenAI default: gpt-4o-mini)
     #[arg(long, default_value = "llama3.2")]
     llm_model: String,
+
+    /// OpenAI-compatible API base URL (default https://api.openai.com/v1)
+    #[arg(long, value_name = "URL")]
+    llm_base_url: Option<String>,
 
     /// Apply corrections (output/ or data/demo_)
     #[arg(long)]
@@ -96,10 +100,11 @@ struct Args {
 fn parse_provider(s: &str) -> Result<LlmProviderChoice, String> {
     match s {
         "anthropic" => Ok(LlmProviderChoice::Anthropic),
+        "openai" => Ok(LlmProviderChoice::OpenAi),
         "ollama" => Ok(LlmProviderChoice::Ollama),
         "none" => Ok(LlmProviderChoice::None),
         other => Err(format!(
-            "--llm-provider must be anthropic|ollama|none, got {other}"
+            "--llm-provider must be anthropic|openai|ollama|none, got {other}"
         )),
     }
 }
@@ -113,6 +118,7 @@ struct AppConfig {
     skip_llm: bool,
     llm_provider: Option<LlmProviderChoice>,
     llm_model: String,
+    llm_base_url: Option<String>,
     apply_corrections: bool,
     runs: u32,
     compare_llm: bool,
@@ -122,6 +128,7 @@ struct AppConfig {
     batch_scale: u32,
     output_data_dir: Option<PathBuf>,
     anthropic_api_key: Option<Secret<String>>,
+    openai_api_key: Option<Secret<String>>,
 }
 
 impl AppConfig {
@@ -139,6 +146,10 @@ impl AppConfig {
             .ok()
             .filter(|s| !s.is_empty())
             .map(Secret::new);
+        let openai_api_key = std::env::var("OPENAI_API_KEY")
+            .ok()
+            .filter(|s| !s.is_empty())
+            .map(Secret::new);
 
         Self {
             root: args.root.unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."))),
@@ -147,6 +158,7 @@ impl AppConfig {
             skip_llm,
             llm_provider,
             llm_model: args.llm_model,
+            llm_base_url: args.llm_base_url,
             apply_corrections: args.apply_corrections,
             runs: args.runs.max(1),
             compare_llm: args.compare_llm,
@@ -156,6 +168,7 @@ impl AppConfig {
             batch_scale: args.batch_scale.max(1),
             output_data_dir: args.output_data_dir,
             anthropic_api_key,
+            openai_api_key,
         }
     }
 
@@ -202,6 +215,8 @@ impl AppConfig {
             llm_model: Some(self.llm_model.clone()),
             seed,
             anthropic_api_key: self.anthropic_api_key.clone(),
+            openai_api_key: self.openai_api_key.clone(),
+            llm_base_url: self.llm_base_url.clone(),
             llm_cache: self.llm_cache,
             llm_cache_path: Some(self.output_dir().join("llm-cache.json")),
         }

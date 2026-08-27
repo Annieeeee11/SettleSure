@@ -59,7 +59,9 @@ Prior to transport hardening, 7/9 ambiguous cases failed with connection errors 
 
 **Anthropic:** HTTP client + error mapping are unit-tested; **live ablation not run in CI by default**. Optional: `npm run ablation-anthropic` when `ANTHROPIC_API_KEY` is set.
 
-**Structured LLM output:** Ollama requests use JSON-schema `format`; verdicts are cached in `output/llm-cache.json` (keyed by candidate hash + model + seed) unless `--no-llm-cache`.
+**Structured LLM output:** Ollama requests use JSON-schema `format`; verdicts are cached in `output/llm-cache.json` (keyed by candidate hash + model + seed; `DefaultHasher` — regenerable if format/version drifts) unless `--no-llm-cache`.
+
+**BYOK:** `--llm-provider openai` + `OPENAI_API_KEY` targets any OpenAI-compatible chat API (`--llm-base-url` for Groq/OpenRouter/etc.). Selection order: explicit flag → `ANTHROPIC_API_KEY` → `OPENAI_API_KEY` → Ollama → none.
 
 ## Throughput benchmark methodology
 

@@ -1,4 +1,8 @@
 //! Disk-backed LLM verdict cache for reproducible ablations.
+//!
+//! Cache keys use [`std::collections::hash_map::DefaultHasher`] — **not stable across Rust
+//! versions or platforms**. Treat the file as regenerable local state; unknown format
+//! versions are cache misses.
 
 use crate::provider::{build_resolve_payload, LlmCallResult, LlmVerdict};
 use settlesure_types::AmbiguousCandidate;
@@ -7,12 +11,20 @@ use std::fs;
 use std::hash::{Hash, Hasher};
 use std::path::Path;
 
+const CACHE_FORMAT_VERSION: u32 = 1;
+
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 struct CachedEntry {
     verdict: String,
     reasoning: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     chosen_settlement_ids: Option<Vec<String>>,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+struct CacheFileV1 {
+    version: u32,
+    entries: HashMap<String, CachedEntry>,
 }
 
 pub struct VerdictCache {
@@ -34,12 +46,23 @@ fn candidate_id(pair: &AmbiguousCandidate) -> String {
     format!("{}:{}", pair.bank.id, pair.settlement.settlement_id)
 }
 
+fn parse_cache_file(raw: &str) -> HashMap<String, CachedEntry> {
+    if let Ok(v1) = serde_json::from_str::<CacheFileV1>(raw) {
+        if v1.version == CACHE_FORMAT_VERSION {
+            return v1.entries;
+        }
+        return HashMap::new();
+    }
+    // Legacy flat map (pre-versioned) — accept once, rewrite on next save.
+    serde_json::from_str(raw).unwrap_or_default()
+}
+
 impl VerdictCache {
     pub fn load(path: impl AsRef<Path>) -> Self {
         let path = path.as_ref().to_path_buf();
         let entries = fs::read_to_string(&path)
             .ok()
-            .and_then(|s| serde_json::from_str(&s).ok())
+            .map(|s| parse_cache_file(&s))
             .unwrap_or_default();
         Self {
             path,
@@ -96,11 +119,40 @@ impl VerdictCache {
         if let Some(parent) = self.path.parent() {
             fs::create_dir_all(parent)?;
         }
-        let json = serde_json::to_string_pretty(&self.entries)?;
+        let file = CacheFileV1 {
+            version: CACHE_FORMAT_VERSION,
+            entries: self.entries.clone(),
+        };
+        let json = serde_json::to_string_pretty(&file)?;
         fs::write(&self.path, json)
     }
 }
 
 pub fn candidate_label(pair: &AmbiguousCandidate) -> String {
     candidate_id(pair)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn legacy_flat_map_loads_and_rewrites_with_version() {
+        let path = std::env::temp_dir().join(format!(
+            "settlesure-cache-test-{}",
+            std::process::id()
+        ));
+        fs::write(
+            &path,
+            r#"{"abc123":{"verdict":"match","reasoning":"ok"}}"#,
+        )
+        .unwrap();
+        let mut cache = VerdictCache::load(&path);
+        assert_eq!(cache.entries.len(), 1);
+        cache.dirty = true;
+        cache.save_if_dirty().unwrap();
+        let saved = fs::read_to_string(&path).unwrap();
+        assert!(saved.contains("\"version\": 1"));
+        let _ = fs::remove_file(path);
+    }
 }

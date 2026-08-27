@@ -254,6 +254,7 @@ pub struct ReconcileResult {
 #[serde(rename_all = "snake_case")]
 pub enum LlmProviderChoice {
     Anthropic,
+    OpenAi,
     Ollama,
     None,
 }
@@ -262,6 +263,7 @@ impl LlmProviderChoice {
     pub fn as_str(self) -> &'static str {
         match self {
             LlmProviderChoice::Anthropic => "anthropic",
+            LlmProviderChoice::OpenAi => "openai",
             LlmProviderChoice::Ollama => "ollama",
             LlmProviderChoice::None => "none",
         }
