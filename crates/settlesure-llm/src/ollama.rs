@@ -59,6 +59,18 @@ impl LlmProvider for OllamaProvider {
         let body = serde_json::json!({
             "model": self.model,
             "stream": false,
+            "format": {
+                "type": "object",
+                "properties": {
+                    "verdict": { "type": "string", "enum": ["match", "no_match", "unsure"] },
+                    "reasoning": { "type": "string" },
+                    "chosenSettlementIds": {
+                        "type": "array",
+                        "items": { "type": "string" }
+                    }
+                },
+                "required": ["verdict", "reasoning"]
+            },
             "options": { "temperature": 0, "seed": self.seed },
             "messages": [
                 { "role": "system", "content": SETTLEMENT_SYSTEM_PROMPT },

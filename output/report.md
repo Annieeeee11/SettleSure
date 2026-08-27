@@ -2,100 +2,92 @@
 
 Razorpay-style 3-way flow: **Payment → Settlement → Bank payout credit** (UTR join).
 
-Seed: `42` · Payments: 71 · Settlements: 71 · Bank credits: 57
-LLM pass: enabled (ollama)
+Seed: `42` · Payments: 77 · Settlements: 77 · Bank credits: 60
+LLM pass: disabled / unavailable
 
 ## Headline metrics
 
 | Metric | Value |
 | --- | --- |
-| Match rate (recall on true matches) | 93.48% |
+| Match rate (recall on true matches) | 85.71% |
 | Precision | 100.00% |
-| Recall | 93.48% |
+| Recall | 85.71% |
 | False positive rate | 0.00% |
-| Exception accuracy | 84.21% |
-| Throughput | 0.57 records/sec |
-| Runtime (total) | 223471.04 ms |
+| Exception accuracy | 71.43% |
+| Throughput | 1500.91 records/sec |
+| Runtime (total) | 91.28 ms |
 
 ### Counts
 
-- True matches in ground truth: 46
-- Predicted matches: 43
-- True positives: 43
+- True matches in ground truth: 49
+- Predicted matches: 42
+- True positives: 42
 - False positives: 0
-- False negatives: 3
-- True exception records: 32
-- Predicted exception records: 38
-- Correctly flagged exceptions: 32
+- False negatives: 7
+- True exception records: 35
+- Predicted exception records: 49
+- Correctly flagged exceptions: 35
 
 ## Match-source breakdown
 
 | Pass | Count |
 | --- | ---: |
-| Exact | 20 |
+| Exact | 23 |
 | Fuzzy | 17 |
 | Split | 2 |
-| LLM | 4 |
+| LLM | 0 |
 | Human | 0 |
 
 | Pass timing | ms |
 | --- | ---: |
-| Exact | 0.08 |
-| Fuzzy | 5.51 |
-| Split | 0.07 |
-| LLM | 223454.72 |
-| Total | 223471.04 |
+| Exact | 1.07 |
+| Fuzzy | 87.88 |
+| Split | 0.35 |
+| LLM | 0.63 |
+| Total | 91.28 |
 
 ## Accuracy by case difficulty
 
 | Difficulty | Match rate | Precision | Deferred | Notes |
 | --- | --- | --- | --- | --- |
 | Clear | 100.00% | 100.00% | — | trivial exact/fuzzy cases |
-| Boundary | 71.43% | 100.00% | — | at fuzzy threshold edge |
-| Decoy | 66.67% | 100.00% | 100.00% | correctly deferred, not auto-resolved to decoy |
+| Boundary | 42.86% | 100.00% | — | at fuzzy threshold edge |
+| Decoy | 50.00% | 100.00% | 100.00% | correctly deferred, not auto-resolved to decoy |
 | Unresolvable | — | — | 100.00% | correctly flagged as exception |
-
-## LLM ablation
-
-| | With LLM | Without LLM |
-| --- | ---: | ---: |
-| Match rate | 93.48% | 84.78% |
-| Precision | 100.00% | 100.00% |
-| Recall | 93.48% | 84.78% |
-| FP rate | 0.00% | 0.00% |
-| LLM matches | 4 | 0 |
-| Provider | ollama | none |
 
 ## Exception list
 
 | Record ID(s) | Source | Reason |
 | --- | --- | --- |
-| setl_0062 | settlement | fee/tax miscalculation: netAmount 3935.4 ≠ gross(3974.78) - fee(75.07) - tax(13.51) = 3886.2 |
-| setl_0063 | settlement | fee/tax miscalculation: netAmount 418.88 ≠ gross(396.38) - fee(6.63) - tax(1.19) = 388.56 |
-| setl_0064 | settlement | fee/tax miscalculation: netAmount 2425.09 ≠ gross(2458.69) - fee(43.17) - tax(7.77) = 2407.75 |
-| bank_0049 | bank | currency mismatch, not auto-resolved |
-| bank_0050 | bank | currency mismatch, not auto-resolved |
-| setl_0068 | settlement | currency mismatch, not auto-resolved |
-| setl_0069 | settlement | currency mismatch, not auto-resolved |
-| bank_0055 | bank | duplicate bank credit — UTR already settled by bank_0054 |
-| bank_0057 | bank | duplicate bank credit — UTR already settled by bank_0056 |
-| bank_0038, setl_0038, setl_0039 | bank+settlement | ambiguous — LLM declined — Insufficient evidence to determine match |
-| bank_0039, setl_0040, setl_0041 | bank+settlement | ambiguous — LLM declined — Insufficient evidence to determine match |
-| bank_0040, setl_0042, setl_0043 | bank+settlement | ambiguous — LLM declined — Insufficient evidence to determine match |
-| bank_0045, setl_0054, setl_0055, setl_0056, setl_0057 | bank+settlement | ambiguous — LLM declined (split) — Insufficient evidence to determine the true batch |
-| bank_0046, setl_0058, setl_0059, setl_0060, setl_0061 | bank+settlement | ambiguous — LLM declined (split) — Insufficient evidence to determine the true batch |
-| bank_0047 | bank | no plausible counterpart in window |
-| bank_0048 | bank | no plausible counterpart in window |
+| setl_0068 | settlement | fee/tax miscalculation: netAmount 4127.24 ≠ gross(4192.03) - fee(80.05) - tax(14.41) = 4097.57 |
+| setl_0069 | settlement | fee/tax miscalculation: netAmount 361.74 ≠ gross(317.58) - fee(5.04) - tax(0.91) = 311.63 |
+| setl_0070 | settlement | fee/tax miscalculation: netAmount 1521.51 ≠ gross(1509.65) - fee(36.16) - tax(6.51) = 1466.98 |
+| bank_0052 | bank | currency mismatch, not auto-resolved |
+| bank_0053 | bank | currency mismatch, not auto-resolved |
+| setl_0074 | settlement | currency mismatch, not auto-resolved |
+| setl_0075 | settlement | currency mismatch, not auto-resolved |
+| bank_0058 | bank | duplicate bank credit — UTR already settled by bank_0057 |
+| bank_0060 | bank | duplicate bank credit — UTR already settled by bank_0059 |
+| bank_0036, setl_0036 | bank+settlement | ambiguous — LLM unavailable |
+| bank_0037, setl_0037 | bank+settlement | ambiguous — LLM unavailable |
+| bank_0038, setl_0038, bank_0048, bank_0050, setl_0039, setl_0060, setl_0061, setl_0062, setl_0063 | bank+settlement | ambiguous — LLM unavailable |
+| bank_0039, setl_0040, setl_0041 | bank+settlement | ambiguous — LLM unavailable |
+| bank_0040, setl_0042, setl_0043 | bank+settlement | ambiguous — LLM unavailable |
+| bank_0041, setl_0044, setl_0045 | bank+settlement | ambiguous — LLM unavailable |
+| bank_0042, setl_0046, setl_0047 | bank+settlement | ambiguous — LLM unavailable |
+| bank_0049, setl_0064, setl_0065, setl_0066, setl_0067 | bank+settlement | ambiguous split — LLM unavailable: ambiguous split — multiple settlement combinations sum to credit: setl_0064+setl_0065 \| setl_0066+setl_0067 |
 | bank_0051 | bank | no plausible counterpart in window |
-| bank_0052 | bank | no plausible counterpart in window |
-| bank_0053 | bank | no plausible counterpart in window |
-| setl_0045 | settlement | settlement present, bank credit missing (payout may be in transit) |
-| setl_0047 | settlement | settlement present, bank credit missing (payout may be in transit) |
-| setl_0065 | settlement | settlement present, bank credit missing (payout may be in transit) |
-| setl_0066 | settlement | settlement present, bank credit missing (payout may be in transit) |
-| setl_0067 | settlement | settlement present, bank credit missing (payout may be in transit) |
+| bank_0054 | bank | no plausible counterpart in window |
+| bank_0055 | bank | no plausible counterpart in window |
+| bank_0056 | bank | no plausible counterpart in window |
+| setl_0049 | settlement | settlement present, bank credit missing (payout may be in transit) |
+| setl_0051 | settlement | settlement present, bank credit missing (payout may be in transit) |
+| setl_0053 | settlement | settlement present, bank credit missing (payout may be in transit) |
+| setl_0071 | settlement | settlement present, bank credit missing (payout may be in transit) |
+| setl_0072 | settlement | settlement present, bank credit missing (payout may be in transit) |
+| setl_0073 | settlement | settlement present, bank credit missing (payout may be in transit) |
 
-_Grouped by relatedIds for display (24 groups from 38 per-record flags). Scoring still uses per-record exceptions._
+_Grouped by relatedIds for display (27 groups from 49 per-record flags). Scoring still uses per-record exceptions._
 
 ## Known limitations
 

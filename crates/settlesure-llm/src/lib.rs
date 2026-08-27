@@ -1,6 +1,7 @@
 //! LLM provider trait + Anthropic/Ollama (async, isolated from the engine).
 
 mod anthropic;
+mod cache;
 mod client;
 mod ollama;
 mod provider;

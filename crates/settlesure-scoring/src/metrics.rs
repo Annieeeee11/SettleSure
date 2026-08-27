@@ -127,8 +127,15 @@ pub fn score_slice(
                     })
                 }));
 
-            if g.exception_type == Some(DiscrepancyClass::NearDuplicateDecoy)
-                && g.settlement_id.is_some()
+            if matches!(
+                g.exception_type,
+                Some(
+                    DiscrepancyClass::NearDuplicateDecoy
+                        | DiscrepancyClass::AcceptBandDecoyAmountUtr
+                        | DiscrepancyClass::AcceptBandDecoyUtrAmountTol
+                        | DiscrepancyClass::AcceptBandDecoyDateWrongRef
+                )
+            ) && g.settlement_id.is_some()
             {
                 let sid = g.settlement_id.as_ref().unwrap();
                 let decoy_picked = result.matches.iter().any(|m| {
@@ -350,6 +357,7 @@ pub fn score_against_ground_truth(
         by_ambiguity_level,
         robustness: None,
         llm_ablation: None,
+        llm_ablation_robustness: None,
     }
 }
 

@@ -155,6 +155,9 @@ pub fn format_markdown(report: &FullReport) -> String {
         "| Exception accuracy | {} |",
         pct(m.exception_accuracy)
     ));
+    lines.push(
+        "_Exception accuracy = correctly flagged ÷ predicted exceptions (precision on exceptions, not recall). Under `--skip-llm`, unresolved ambiguous GT matches inflate predicted exceptions (`ambiguous — LLM unavailable`), lowering this metric by design; with LLM enabled those cases resolve to matches._".into(),
+    );
     lines.push(format!(
         "| Throughput | {} records/sec |",
         m.throughput_records_per_sec
@@ -324,6 +327,74 @@ pub fn format_markdown(report: &FullReport) -> String {
         lines.push(format!(
             "| Provider | {} | none |",
             a.with_llm.provider.as_deref().unwrap_or("")
+        ));
+        if let Some(ref stats) = a.call_stats {
+            lines.push(format!(
+                "| LLM calls | {} | — |",
+                stats.call_count
+            ));
+            lines.push(format!(
+                "| Verdicts (match / no_match / declined / errors) | {} / {} / {} / {} | — |",
+                stats.verdict_match,
+                stats.verdict_no_match,
+                stats.verdict_unsure,
+                stats.provider_errors
+            ));
+            if let Some(ref log) = stats.verdict_log {
+                lines.push(String::new());
+                lines.push("### LLM verdict log".into());
+                lines.push(String::new());
+                lines.push("| Candidate | Verdict | Reasoning | Latency (ms) |".into());
+                lines.push("| --- | --- | --- | ---: |".into());
+                for entry in log {
+                    let reasoning = entry.reasoning.replace('|', "\\|");
+                    lines.push(format!(
+                        "| {} | {} | {} | {:.1} |",
+                        entry.candidate_id, entry.verdict, reasoning, entry.latency_ms
+                    ));
+                }
+            }
+        }
+        lines.push(String::new());
+    }
+
+    if let Some(ref r) = m.llm_ablation_robustness {
+        lines.push("## LLM ablation across seeds".into());
+        lines.push(String::new());
+        lines.push(format!(
+            "Seeds: {}",
+            r.seeds
+                .iter()
+                .map(|s| s.to_string())
+                .collect::<Vec<_>>()
+                .join(", ")
+        ));
+        lines.push(String::new());
+        lines.push("| Metric | Mean | Min | Max |".into());
+        lines.push("| --- | ---: | ---: | ---: |".into());
+        lines.push(format!(
+            "| Recall lift (with − without) | {} | {} | {} |",
+            pct(r.recall_lift.mean),
+            pct(r.recall_lift.min),
+            pct(r.recall_lift.max)
+        ));
+        lines.push(format!(
+            "| Recall with LLM | {} | {} | {} |",
+            pct(r.with_llm_recall.mean),
+            pct(r.with_llm_recall.min),
+            pct(r.with_llm_recall.max)
+        ));
+        lines.push(format!(
+            "| Recall without LLM | {} | {} | {} |",
+            pct(r.without_llm_recall.mean),
+            pct(r.without_llm_recall.min),
+            pct(r.without_llm_recall.max)
+        ));
+        lines.push(format!(
+            "| LLM matches | {:.1} | {:.0} | {:.0} |",
+            r.llm_matches.mean,
+            r.llm_matches.min,
+            r.llm_matches.max
         ));
         lines.push(String::new());
     }

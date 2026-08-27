@@ -113,6 +113,9 @@ pub enum DiscrepancyClass {
     ReferenceMangledBoundary,
     FuzzyAmbiguousMatch,
     NearDuplicateDecoy,
+    AcceptBandDecoyAmountUtr,
+    AcceptBandDecoyUtrAmountTol,
+    AcceptBandDecoyDateWrongRef,
     DuplicateBank,
     CurrencyMismatch,
     FeeTaxMismatch,
@@ -333,6 +336,29 @@ pub struct LlmCallStats {
     pub latency_ms_min: f64,
     pub latency_ms_max: f64,
     pub latency_ms_mean: f64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub verdict_log: Option<Vec<LlmVerdictLogEntry>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LlmVerdictLogEntry {
+    pub candidate_id: String,
+    pub verdict: String,
+    pub reasoning: String,
+    pub latency_ms: f64,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LlmAblationRobustnessSummary {
+    pub seeds: Vec<u32>,
+    pub recall_lift: MetricRange,
+    pub with_llm_recall: MetricRange,
+    pub without_llm_recall: MetricRange,
+    pub llm_matches: MetricRange,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub per_seed: Option<Vec<LlmAblationSummary>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -378,6 +404,8 @@ pub struct ScoreReport {
     pub robustness: Option<RobustnessSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub llm_ablation: Option<LlmAblationSummary>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub llm_ablation_robustness: Option<LlmAblationRobustnessSummary>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

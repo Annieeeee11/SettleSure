@@ -58,6 +58,26 @@ if (baseline.minDecoyDeferred != null) {
   if (!ok) failed = true;
 }
 
+// Perfect decoy deferral — no decoy may be auto-matched.
+if (baseline.requireDecoyPerfectDeferral) {
+  const decoy = m.byAmbiguityLevel?.decoy;
+  const total = decoy?.deferredTotal ?? 0;
+  const correct = decoy?.correctlyDeferred ?? 0;
+  const ok = total === 0 || correct === total;
+  console.log(
+    `requireDecoyPerfectDeferral (${correct}/${total}) → ${ok ? "ok" : "FAIL"}`,
+  );
+  if (!ok) failed = true;
+}
+
+if (baseline.minExceptionAccuracySkipLlm != null) {
+  const ok = m.exceptionAccuracy >= baseline.minExceptionAccuracySkipLlm;
+  console.log(
+    `exceptionAccuracy=${m.exceptionAccuracy} >= ${baseline.minExceptionAccuracySkipLlm} → ${ok ? "ok" : "FAIL"}`,
+  );
+  if (!ok) failed = true;
+}
+
 // Catch suspiciously perfect skip-llm runs with no tier usage.
 if (baseline.forbidSuspiciousPerfect) {
   const src = m.matchSourceBreakdown || {};

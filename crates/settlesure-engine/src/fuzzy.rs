@@ -6,7 +6,7 @@ use settlesure_types::{
     DiscrepancyClass, Exception, ExceptionSource, MatchResult, MatchSource, ReconcileConfig,
     Settlement, DEFAULT_CONFIG,
 };
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 fn parse_date_ms(date_str: &str) -> i64 {
     // YYYY-MM-DD at 12:00:00Z — matches TS `new Date(`${date}T12:00:00Z`)`
@@ -124,6 +124,62 @@ struct Scored {
     currency_mismatch: bool,
 }
 
+type BucketKey = (String, i64, i64);
+
+fn amount_bucket(amount: f64, config: &ReconcileConfig) -> i64 {
+    let width = amount_tolerance(amount, config).max(0.01);
+    (amount / width).floor() as i64
+}
+
+fn date_bucket(date: &str, config: &ReconcileConfig) -> i64 {
+    let window_ms = (config.date_window_days * 86_400_000.0).max(1.0) as i64;
+    parse_date_ms(date) / window_ms
+}
+
+fn build_settlement_index(
+    settlement_pool: &[Settlement],
+    config: &ReconcileConfig,
+) -> HashMap<BucketKey, Vec<usize>> {
+    let mut index: HashMap<BucketKey, Vec<usize>> = HashMap::new();
+    for (idx, settlement) in settlement_pool.iter().enumerate() {
+        let key = (
+            settlement.currency.clone(),
+            amount_bucket(settlement.net_amount, config),
+            date_bucket(&settlement.settled_at, config),
+        );
+        index.entry(key).or_default().push(idx);
+    }
+    index
+}
+
+fn candidate_settlement_indices(
+    bank: &BankCredit,
+    index: &HashMap<BucketKey, Vec<usize>>,
+    config: &ReconcileConfig,
+) -> Vec<usize> {
+    let base_a = amount_bucket(bank.credited_amount, config);
+    let base_d = date_bucket(&bank.credited_at, config);
+    let mut out = Vec::new();
+    let mut seen = HashSet::new();
+    for da in -1..=1 {
+        for dd in -1..=1 {
+            let key = (
+                bank.currency.clone(),
+                base_a + da,
+                base_d + dd,
+            );
+            if let Some(idxs) = index.get(&key) {
+                for &idx in idxs {
+                    if seen.insert(idx) {
+                        out.push(idx);
+                    }
+                }
+            }
+        }
+    }
+    out
+}
+
 pub fn fuzzy_match(
     bank_pool: &[BankCredit],
     settlement_pool: &[Settlement],
@@ -137,9 +193,12 @@ pub fn fuzzy_match(
 
     let mut candidates: Vec<Scored> = Vec::new();
     let min_ref_similarity = 0.65;
+    let settlement_index = build_settlement_index(settlement_pool, config);
 
     for bank in bank_pool {
-        for settlement in settlement_pool {
+        let settlement_indices = candidate_settlement_indices(bank, &settlement_index, config);
+        for idx in settlement_indices {
+            let settlement = &settlement_pool[idx];
             if bank.currency != settlement.currency
                 && bank.utr == settlement.utr
                 && bank.credited_at == settlement.settled_at
@@ -172,6 +231,25 @@ pub fn fuzzy_match(
                     score,
                     reason,
                     currency_mismatch: false,
+                });
+            }
+        }
+    }
+
+    // Cross-currency pairs with identical UTR/date/amount (not in same currency bucket).
+    for bank in bank_pool {
+        for settlement in settlement_pool {
+            if bank.currency != settlement.currency
+                && bank.utr == settlement.utr
+                && bank.credited_at == settlement.settled_at
+                && bank.credited_amount == settlement.net_amount
+            {
+                candidates.push(Scored {
+                    bank: bank.clone(),
+                    settlement: settlement.clone(),
+                    score: 0.0,
+                    reason: "currency mismatch, not auto-resolved".into(),
+                    currency_mismatch: true,
                 });
             }
         }

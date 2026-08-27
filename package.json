@@ -10,6 +10,10 @@
     "test": "cargo test --workspace",
     "dashboard": "npm run dev --prefix dashboard",
     "check-baseline": "node scripts/check-baseline.mjs",
+    "check-ablation-seeds": "node scripts/check-ablation-seeds.mjs",
+    "ablation-seeds": "cargo run -p settlesure-cli -- --seed 42 --runs 5 --compare-llm --llm-provider ollama --llm-model llama3.2 --no-banner",
+    "ablation-models": "echo 'Run per model: cargo run -p settlesure-cli -- --seed 42 --compare-llm --llm-provider ollama --llm-model <name> --no-llm-cache'",
+    "ablation-anthropic": "sh scripts/ablation-anthropic.sh",
     "bench-throughput": "node scripts/bench-throughput.mjs --runs 5 --scales 1,10,50",
     "sweep-decoys": "RUN_SWEEP=1 cargo test -p settlesure-integration write_decoy_sweep -- --nocapture",
     "clippy": "cargo clippy --all-targets --all-features -- -D warnings"

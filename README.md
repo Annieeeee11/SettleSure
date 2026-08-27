@@ -4,24 +4,41 @@
 ![Rust](https://img.shields.io/badge/rust-1.90+-orange?style=flat&logo=rust)
 ![CI](https://github.com/Annieeeee11/SettleSure/actions/workflows/ci.yml/badge.svg)
 
-**Track 04 bar (seed 42):** **84.78% recall / 100% precision** with an honest exception list (7 ambiguous GT matches left unresolved under `--skip-llm`); **3.6×** deterministic throughput vs the TS oracle at 1× scale; **93.48% recall** with local Ollama LLM on the same batch.
+**Track 04 bar (seed 42):** **85.71% recall / 100% precision** with an honest exception list (7 ambiguous GT matches left unresolved under `--skip-llm`); **3.6×** deterministic throughput vs the TS oracle at 1× scale; **LLM lift is model-dependent** (see model sensitivity table below).
 
 ## Current headline metrics (seed 42, `--skip-llm`)
 
 | Precision | Recall | FP rate | Exact / Fuzzy / Split / LLM / Human |
 | ---: | ---: | ---: | ---: |
-| 100% | 84.78% | 0% | 20 / 17 / 2 / 0 / 0 |
+| 100% | 85.71% | 0% | 23 / 17 / 2 / 0 / 0 |
 
-**LLM ablation (comparative — Ollama `llama3.2`, measured 2026-08-27):**
+> **LLM lift is model-dependent.** An arbitrary local Ollama model may show **zero recall gain**. Re-measure with `npm run ablation-models` before claiming LLM numbers.
+
+**Model sensitivity (seed 42, `--compare-llm`, measured 2026-08-27):**
+
+| Model | Recall w/ LLM | LLM matches | Verdicts (match / no_match / declined) |
+| --- | ---: | ---: | --- |
+| none (`--skip-llm`) | 85.71% | 0 | — |
+| qwen2.5:7b | 85.71% | 0 | 0 / 7 / 2 |
+| llama3.2 | 93.48%† | 4 | 4 / 0 / 5 |
+| qwen2.5-coder:7b | 100.00% | 7 | 7 / 0 / 2 |
+
+† `llama3.2` ablation used pre–accept-band-bait batch layout (84.78% skip-llm baseline); re-run `npm run ablation-models` after generator changes.
+
+**Anthropic:** transport/error handling is unit-tested; **live ablation not run by default**. Optional: `npm run ablation-anthropic` when `ANTHROPIC_API_KEY` is set (uses `claude-3-5-haiku-latest`).
+
+**LLM ablation (comparative — Ollama `llama3.2`, single seed, measured 2026-08-27):**
 
 | | With LLM | Without LLM |
 | --- | ---: | ---: |
-| Match rate / Recall | 93.48% | 84.78% |
+| Match rate / Recall | 93.48% | 84.78%† |
 | Precision / FP | 100% / 0% | 100% / 0% |
 | LLM matches | 4 | 0 |
 | Match sources | 20 / 17 / 2 / 4 / 0 | 20 / 17 / 2 / 0 / 0 |
 | LLM pass wall time | ~136s | ~1ms |
 | Per-call latency (9 calls) | min 7.9s · mean 15.1s · max 58.2s | — |
+
+**Multi-seed LLM ablation:** `npm run ablation-seeds` runs `--compare-llm --runs 5` (seeds 42–46) and reports mean/min/max recall lift in `output/report.md`. CI runs this optionally when Ollama is available (never blocks merge).
 
 Deterministic passes at seed-42 scale finish in single-digit milliseconds; LLM verification is the throughput bottleneck (~15s/call on local `llama3.2`).
 
@@ -60,7 +77,7 @@ See [`MIGRATION_NOTES.md`](MIGRATION_NOTES.md) for the TypeScript → Rust port 
 3. **Bank credits**: UTR join on net ≈ credited  
 4. Passes: integrity → exact → fuzzy → split → LLM → human corrections  
 
-Adversarial cases include near duplicate decoys, boundary reference mangles, decoy subset sums, and unresolvable noise. They're scored with `ambiguityLevel` (`clear` / `boundary` / `decoy` / `unresolvable`).
+Adversarial cases include near duplicate decoys, **accept-band precision bait** (decoys engineered to cross the 0.75 fuzzy threshold), boundary reference mangles, decoy subset sums, and unresolvable noise. They're scored with `ambiguityLevel` (`clear` / `boundary` / `decoy` / `unresolvable`).
 
 ## Quick start
 
@@ -80,8 +97,9 @@ npm run dashboard   # http://localhost:5173
 | `--llm-provider <…>` | `anthropic` \| `ollama` \| `none` |
 | `--llm-model <name>` | Ollama model (default `llama3.2`) |
 | `--apply-corrections` | Apply `output/corrections.json` or `data/demo_corrections.json` |
-| `--runs <n>` | Multi-seed robustness (seeds `seed..seed+n-1`) |
-| `--compare-llm` | Side-by-side LLM on vs off ablation |
+| `--runs <n>` | Multi-seed robustness (seeds `seed..seed+n-1`); combine with `--compare-llm` for multi-seed LLM ablation |
+| `--compare-llm` | Side-by-side LLM on vs off ablation (works with `--runs`) |
+| `--no-llm-cache` | Disable `output/llm-cache.json` verdict cache (fresh model calls) |
 | `--dump-matches [path]` | Write NDJSON match triples (default `output/matches.ndjson`) |
 | `--batch-scale <n>` | Multiply adversarial class counts when generating (default `1`) |
 | `--output-data-dir <dir>` | Override data output path (with `--generate-only`) |
@@ -100,7 +118,7 @@ Deterministic passes only (exact + fuzzy + split), measured with fresh subproces
 
 At seed-42 scale (71 records), both engines finish deterministic reconciliation in single-digit milliseconds — the ~3.6× gap is real but modest in absolute terms.
 
-**Why speedup shrinks at scale:** The fuzzy pass dominates runtime (~27.5s TS / ~12.5s Rust out of ~28s / ~13s total at 50×). Both engines use the same O(banks × settlements) pairwise-comparison algorithm in `fuzzy.rs` — the Rust rewrite improves **constant factors** (lower per-pair overhead), not algorithmic complexity. That is why speedup drops from 3.6× at 1× to ~2.2× at 10× and 50×: as fuzzy time grows super-linearly, it swamps the fixed overhead wins. An indexed or bucketed pre-filter for fuzzy candidate generation would be the next real throughput lever at larger batch sizes — separate from language choice.
+**Why speedup shrinks at scale:** The fuzzy pass dominates runtime (~27.5s TS / ~12.5s Rust out of ~28s / ~13s total at 50×). Fuzzy now uses an **amount × date bucket pre-filter** before pairwise scoring (same candidate set, fewer comparisons). The Rust rewrite still improves constant factors; bucketing is the next lever at larger batch sizes.
 
 **Pass breakdown at 50× scale (mean ms):**
 
@@ -119,22 +137,24 @@ The image packages **`settlesure-cli` only** (~160 MB) — no Node, no dashboard
 ```bash
 docker build -t settlesure .
 docker run --rm settlesure --seed 42 --skip-llm --no-banner
+# Dashboard + engine (mounts output/report.json):
+docker compose up dashboard
 ```
 
 **Verified output** (2026-08-27, `docker build` + `docker run` on Colima/arm64):
 
 | Metric | Value |
 | --- | ---: |
-| Recall / match rate | 84.78% |
+| Recall / match rate | 85.71% |
 | Precision / FP | 100% / 0% |
-| Match sources | 20 / 17 / 2 / 0 / 0 |
+| Match sources | 23 / 17 / 2 / 0 / 0 |
 
 The CLI regenerates `data/` and writes `output/` at runtime under `/app`.
 
 **Known container limitations:**
 
 - **`--compare-llm --llm-provider ollama`** falls back to `LLM: none` with a WARN log (`localhost:11434 unreachable`) — Ollama runs on the host, not inside the container. This exits cleanly (no hang/crash); use native `cargo run` or host-network wiring for LLM ablation.
-- **Dashboard `/api/rerun`** ([`dashboard/vite.config.ts`](dashboard/vite.config.ts)) shells out to `cargo run` on the host — a **local-dev convenience** requiring a local Rust toolchain. Not included in the image. A fully containerized dashboard+engine demo would be a separate `docker-compose.yml`.
+- **Dashboard `/api/rerun`** ([`dashboard/vite.config.ts`](dashboard/vite.config.ts)) shells out to `cargo run` on the host — a **local-dev convenience** requiring a local Rust toolchain. Use [`docker-compose.yml`](docker-compose.yml) for a containerized dashboard+engine demo (Ollama still on host for LLM ablation).
 
 ## Cargo workspace
 
@@ -147,6 +167,8 @@ Engine has no network code; LLM is isolated and async.
 ## Metrics (never blended)
 
 Overall precision, recall, and FP rate are reported separately, plus **Accuracy by case difficulty** in `output/report.md` and the dashboard.
+
+**Exception accuracy** = correctly flagged exceptions ÷ predicted exception count (precision on exceptions, not recall). Under `--skip-llm`, the 7 deliberately-unresolved ambiguous GT **matches** produce `ambiguous — LLM unavailable` exception rows that inflate the denominator without being GT exceptions — **~71%** (35/49) at current seed 42. With LLM enabled those cases resolve to matches and exception accuracy rises (~84%+). This is expected, not a regression.
 
 ## Tests & CI
 
@@ -166,16 +188,17 @@ CI fails if seed 42 is suspiciously perfect (100%/100%/0% with zero LLM/human ti
 | Pre-fix TS (`1b4a43c`) | 97.67% / 91.30% | 22 / 18 / 3 | Dup-UTR false splits + prefix floor 0.9 |
 | Fixed TS (`17c0c88`, `7a67d75`) | 100% / 100% | 22 / 22 / 2 | Dup-UTR split gate + prefix floor 0.92 |
 | Rust port (same engine) | 100% / 100% | 22 / 22 / 2 | Correct parity with fixed TS |
-| **Hardened generator (current)** | **100% / 84.78%** | **20 / 17 / 2** | Adversarial cases target LLM tier again |
+| **Hardened generator (current)** | **100% / 85.71%** | **23 / 17 / 2** | Accept-band decoy bait + LLM-tier ambiguous cases |
 
 Root cause of the historical 22/18/3 gap: TS commits [`17c0c88`](.) (duplicate-UTR split gate) and [`7a67d75`](.) (prefix floor 0.92). Rust reproduces fixed TS behavior; the generator was subsequently hardened so truncated-prefix mangling alone cannot trivialize the batch.
 
 ## Known limitations
 
 - Split matching is bounded (pool ≤25, combo ≤6)
-- Fuzzy matching is O(banks × settlements) pairwise scan in both TS and Rust — dominates runtime at scale; an indexed/bucketed candidate pre-filter would help beyond language rewrites
+- Fuzzy matching buckets candidates by amount × date window before pairwise scoring (reduces comparisons at scale)
 - Ambiguous multi-solution batches are not auto-picked; they are routed to the LLM/human tier
 - No FX conversion
-- Local LLM output isn't deterministic
+- Ollama uses `temperature: 0` + fixed seed + JSON schema `format`; residual nondeterminism may remain (model/hardware)
+- Anthropic live ablation not verified by default — use `npm run ablation-anthropic` with API key
 - `--skip-llm` intentionally under-matches ambiguous GT rows — use `--compare-llm` (native/Ollama on host) or `--apply-corrections` to exercise fallback tiers
 - Docker image is CLI-only; Ollama/LLM ablation requires host-side provider access

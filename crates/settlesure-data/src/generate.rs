@@ -4,9 +4,9 @@ use crate::rng::{create_rng, Mulberry32};
 use chrono::{Duration, NaiveDate, TimeZone, Utc};
 use settlesure_engine::{levenshtein, normalize_reference, reference_similarity, score_pair};
 use settlesure_types::{
-    round_money, AmbiguityLevel, BankCredit, Correction, CorrectionDecision, DiscrepancyClass,
-    ExceptionSource, GroundTruthLabel, GroundTruthLabelKind, Payment, PaymentStatus,
-    ReconcileConfig, Result, SettleSureError, Settlement, DEFAULT_CONFIG,
+    round_money, amount_tolerance, AmbiguityLevel, BankCredit, Correction, CorrectionDecision,
+    DiscrepancyClass, ExceptionSource, GroundTruthLabel, GroundTruthLabelKind, Payment,
+    PaymentStatus, ReconcileConfig, Result, SettleSureError, Settlement, DEFAULT_CONFIG,
 };
 use std::fs;
 use std::path::Path;
@@ -55,6 +55,26 @@ impl Default for GenerateDatasetOpts {
 
 fn composite_score(bank: &BankCredit, settlement: &Settlement, cfg: &ReconcileConfig) -> f64 {
     score_pair(bank, settlement, cfg).0
+}
+
+/// Generation-time guard: decoy-bank pair must cross accept threshold; true must win greedy ranking.
+fn assert_accept_band_bait(
+    bank: &BankCredit,
+    true_settlement: &Settlement,
+    decoy_settlement: &Settlement,
+    cfg: &ReconcileConfig,
+) {
+    let decoy_score = composite_score(bank, decoy_settlement, cfg);
+    let true_score = composite_score(bank, true_settlement, cfg);
+    assert!(
+        decoy_score >= cfg.fuzzy_accept_threshold,
+        "decoy must be accept-band bait (score {decoy_score:.4} < {})",
+        cfg.fuzzy_accept_threshold
+    );
+    assert!(
+        true_score > decoy_score + 0.01,
+        "true must dominate greedy ranking (true {true_score:.4} vs decoy {decoy_score:.4})"
+    );
 }
 
 /// Mangling that avoids truncated-prefix pairs (which hit the 0.92 ref floor).
@@ -301,7 +321,7 @@ pub fn generate_dataset(seed: u32, opts: GenerateDatasetOpts) -> Result<Generate
         format!("bank_{}", pad(bank_seq, 4))
     };
 
-    let class_plan: [(DiscrepancyClass, usize, AmbiguityLevel); 15] = [
+    let class_plan: [(DiscrepancyClass, usize, AmbiguityLevel); 18] = [
         (DiscrepancyClass::Clean, 18, AmbiguityLevel::Clear),
         (DiscrepancyClass::DateShifted, 6, AmbiguityLevel::Clear),
         (DiscrepancyClass::AmountShifted, 5, AmbiguityLevel::Clear),
@@ -317,6 +337,21 @@ pub fn generate_dataset(seed: u32, opts: GenerateDatasetOpts) -> Result<Generate
             AmbiguityLevel::Boundary,
         ),
         (DiscrepancyClass::NearDuplicateDecoy, 3, AmbiguityLevel::Decoy),
+        (
+            DiscrepancyClass::AcceptBandDecoyAmountUtr,
+            1,
+            AmbiguityLevel::Decoy,
+        ),
+        (
+            DiscrepancyClass::AcceptBandDecoyUtrAmountTol,
+            1,
+            AmbiguityLevel::Decoy,
+        ),
+        (
+            DiscrepancyClass::AcceptBandDecoyDateWrongRef,
+            1,
+            AmbiguityLevel::Decoy,
+        ),
         (DiscrepancyClass::BatchedPayout, 2, AmbiguityLevel::Clear),
         (
             DiscrepancyClass::BatchedPayoutAmbiguous,
@@ -700,6 +735,201 @@ pub fn generate_dataset(seed: u32, opts: GenerateDatasetOpts) -> Result<Generate
                         payment_id: Some(pay_decoy.payment_id),
                         label: GroundTruthLabelKind::Exception,
                         exception_type: Some(DiscrepancyClass::NearDuplicateDecoy),
+                        class: Some(cls),
+                        ambiguity_level: level,
+                    });
+                }
+                DiscrepancyClass::AcceptBandDecoyAmountUtr => {
+                    let pay_true = push_payment(gross, currency, &date);
+                    let true_id = next_settlement_id();
+                    let decoy_id = next_settlement_id();
+                    let bank_id = next_bank_id();
+                    let (decoy_utr, decoy_settled) =
+                        mangle_for_composite_score(&utr, net, &date, 0.76, 0.85, &mut rng);
+                    let pay_decoy = push_payment(gross, currency, &date);
+                    let bank = BankCredit {
+                        id: bank_id.clone(),
+                        utr: utr.clone(),
+                        credited_amount: net,
+                        credited_at: date.clone(),
+                        currency: currency.to_string(),
+                    };
+                    let true_settlement = Settlement {
+                        settlement_id: true_id.clone(),
+                        payment_id: pay_true.payment_id.clone(),
+                        gross_amount: gross,
+                        fee,
+                        tax,
+                        net_amount: net,
+                        settled_at: date.clone(),
+                        utr: utr.clone(),
+                        currency: currency.to_string(),
+                    };
+                    let decoy_settlement = Settlement {
+                        settlement_id: decoy_id.clone(),
+                        payment_id: pay_decoy.payment_id.clone(),
+                        gross_amount: gross,
+                        fee,
+                        tax,
+                        net_amount: net,
+                        settled_at: decoy_settled.clone(),
+                        utr: decoy_utr.clone(),
+                        currency: currency.to_string(),
+                    };
+                    assert_accept_band_bait(&bank, &true_settlement, &decoy_settlement, &DEFAULT_CONFIG);
+                    settlements.push(true_settlement);
+                    settlements.push(decoy_settlement);
+                    bank_credits.push(bank);
+                    ground_truth.push(GroundTruthLabel {
+                        bank_credit_id: Some(bank_id),
+                        settlement_id: Some(true_id),
+                        settlement_ids: None,
+                        decoy_settlement_id: Some(decoy_id.clone()),
+                        payment_id: Some(pay_true.payment_id),
+                        label: GroundTruthLabelKind::Match,
+                        exception_type: None,
+                        class: Some(cls),
+                        ambiguity_level: level,
+                    });
+                    ground_truth.push(GroundTruthLabel {
+                        bank_credit_id: None,
+                        settlement_id: Some(decoy_id),
+                        settlement_ids: None,
+                        decoy_settlement_id: None,
+                        payment_id: Some(pay_decoy.payment_id),
+                        label: GroundTruthLabelKind::Exception,
+                        exception_type: Some(DiscrepancyClass::AcceptBandDecoyAmountUtr),
+                        class: Some(cls),
+                        ambiguity_level: level,
+                    });
+                }
+                DiscrepancyClass::AcceptBandDecoyUtrAmountTol => {
+                    let pay_true = push_payment(gross, currency, &date);
+                    let true_id = next_settlement_id();
+                    let decoy_id = next_settlement_id();
+                    let bank_id = next_bank_id();
+                    let tol = amount_tolerance(net, &DEFAULT_CONFIG);
+                    let decoy_net = round_money(net - tol * 0.4);
+                    let decoy_fee = round_money(decoy_net * 0.02);
+                    let decoy_tax = round_money(decoy_fee * 0.18);
+                    let decoy_gross = round_money(decoy_net + decoy_fee + decoy_tax);
+                    let pay_decoy = push_payment(decoy_gross, currency, &date);
+                    let bank = BankCredit {
+                        id: bank_id.clone(),
+                        utr: utr.clone(),
+                        credited_amount: net,
+                        credited_at: date.clone(),
+                        currency: currency.to_string(),
+                    };
+                    let true_settlement = Settlement {
+                        settlement_id: true_id.clone(),
+                        payment_id: pay_true.payment_id.clone(),
+                        gross_amount: gross,
+                        fee,
+                        tax,
+                        net_amount: net,
+                        settled_at: date.clone(),
+                        utr: utr.clone(),
+                        currency: currency.to_string(),
+                    };
+                    let decoy_settlement = Settlement {
+                        settlement_id: decoy_id.clone(),
+                        payment_id: pay_decoy.payment_id.clone(),
+                        gross_amount: decoy_gross,
+                        fee: decoy_fee,
+                        tax: decoy_tax,
+                        net_amount: decoy_net,
+                        settled_at: date.clone(),
+                        utr: utr.clone(),
+                        currency: currency.to_string(),
+                    };
+                    assert_accept_band_bait(&bank, &true_settlement, &decoy_settlement, &DEFAULT_CONFIG);
+                    settlements.push(true_settlement);
+                    settlements.push(decoy_settlement);
+                    bank_credits.push(bank);
+                    ground_truth.push(GroundTruthLabel {
+                        bank_credit_id: Some(bank_id),
+                        settlement_id: Some(true_id),
+                        settlement_ids: None,
+                        decoy_settlement_id: Some(decoy_id.clone()),
+                        payment_id: Some(pay_true.payment_id),
+                        label: GroundTruthLabelKind::Match,
+                        exception_type: None,
+                        class: Some(cls),
+                        ambiguity_level: level,
+                    });
+                    ground_truth.push(GroundTruthLabel {
+                        bank_credit_id: None,
+                        settlement_id: Some(decoy_id),
+                        settlement_ids: None,
+                        decoy_settlement_id: None,
+                        payment_id: Some(pay_decoy.payment_id),
+                        label: GroundTruthLabelKind::Exception,
+                        exception_type: Some(DiscrepancyClass::AcceptBandDecoyUtrAmountTol),
+                        class: Some(cls),
+                        ambiguity_level: level,
+                    });
+                }
+                DiscrepancyClass::AcceptBandDecoyDateWrongRef => {
+                    let pay_true = push_payment(gross, currency, &date);
+                    let true_id = next_settlement_id();
+                    let decoy_id = next_settlement_id();
+                    let bank_id = next_bank_id();
+                    let (decoy_utr, _) =
+                        mangle_for_composite_score(&utr, net, &date, 0.76, 0.85, &mut rng);
+                    let pay_decoy = push_payment(gross, currency, &date);
+                    let bank = BankCredit {
+                        id: bank_id.clone(),
+                        utr: utr.clone(),
+                        credited_amount: net,
+                        credited_at: date.clone(),
+                        currency: currency.to_string(),
+                    };
+                    let true_settlement = Settlement {
+                        settlement_id: true_id.clone(),
+                        payment_id: pay_true.payment_id.clone(),
+                        gross_amount: gross,
+                        fee,
+                        tax,
+                        net_amount: net,
+                        settled_at: date.clone(),
+                        utr: utr.clone(),
+                        currency: currency.to_string(),
+                    };
+                    let decoy_settlement = Settlement {
+                        settlement_id: decoy_id.clone(),
+                        payment_id: pay_decoy.payment_id.clone(),
+                        gross_amount: gross,
+                        fee,
+                        tax,
+                        net_amount: net,
+                        settled_at: date.clone(),
+                        utr: decoy_utr.clone(),
+                        currency: currency.to_string(),
+                    };
+                    assert_accept_band_bait(&bank, &true_settlement, &decoy_settlement, &DEFAULT_CONFIG);
+                    settlements.push(true_settlement);
+                    settlements.push(decoy_settlement);
+                    bank_credits.push(bank);
+                    ground_truth.push(GroundTruthLabel {
+                        bank_credit_id: Some(bank_id),
+                        settlement_id: Some(true_id),
+                        settlement_ids: None,
+                        decoy_settlement_id: Some(decoy_id.clone()),
+                        payment_id: Some(pay_true.payment_id),
+                        label: GroundTruthLabelKind::Match,
+                        exception_type: None,
+                        class: Some(cls),
+                        ambiguity_level: level,
+                    });
+                    ground_truth.push(GroundTruthLabel {
+                        bank_credit_id: None,
+                        settlement_id: Some(decoy_id),
+                        settlement_ids: None,
+                        decoy_settlement_id: None,
+                        payment_id: Some(pay_decoy.payment_id),
+                        label: GroundTruthLabelKind::Exception,
+                        exception_type: Some(DiscrepancyClass::AcceptBandDecoyDateWrongRef),
                         class: Some(cls),
                         ambiguity_level: level,
                     });

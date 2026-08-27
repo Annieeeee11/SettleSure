@@ -2,17 +2,19 @@
   "seed": 42,
   "minPrecision": 0.88,
   "minRecall": 0.84,
-  "maxFalsePositiveRate": 0.05,
+  "maxFalsePositiveRate": 0,
   "minMatchRate": 0.84,
   "minGtAmbiguityCases": {
     "boundary": 3,
-    "decoy": 3,
+    "decoy": 6,
     "unresolvable": 10
   },
-  "minDecoyDeferred": 14,
+  "minDecoyDeferred": 20,
+  "requireDecoyPerfectDeferral": true,
+  "minExceptionAccuracySkipLlm": 0.69,
   "forbidSuspiciousPerfect": true,
   "expectedMatchSources": {
-    "exact": 20,
+    "exact": 23,
     "fuzzy": 17,
     "split": 2,
     "llm": 0,

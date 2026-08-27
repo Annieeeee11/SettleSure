@@ -18,13 +18,15 @@
 //! ```
 
 use crate::anthropic::AnthropicProvider;
+use crate::cache::{candidate_label, VerdictCache};
 use crate::ollama::{is_ollama_reachable, OllamaProvider};
 use crate::provider::{resolve_with_retry_timed, LlmCallResult, LlmProvider, VerdictKind};
 use settlesure_types::{
     AmbiguousCandidate, AmbiguousKind, DiscrepancyClass, Exception, ExceptionSource, LlmCallStats,
-    LlmProviderChoice, MatchResult, MatchSource, Secret,
+    LlmProviderChoice, LlmVerdictLogEntry, MatchResult, MatchSource, Secret,
 };
 use std::collections::HashSet;
+use std::path::PathBuf;
 use tracing::{info, warn};
 
 /// Same shape as engine `LlmPassResult` — convert at the CLI boundary.
@@ -43,6 +45,8 @@ pub struct LlmSelectOptions {
     pub llm_model: Option<String>,
     pub seed: u32,
     pub anthropic_api_key: Option<Secret<String>>,
+    pub llm_cache: bool,
+    pub llm_cache_path: Option<PathBuf>,
 }
 
 pub struct SelectedLlm {
@@ -57,6 +61,7 @@ struct CallStatsAccumulator {
     verdict_unsure: usize,
     provider_errors: usize,
     latencies_ms: Vec<f64>,
+    verdict_log: Vec<LlmVerdictLogEntry>,
 }
 
 impl CallStatsAccumulator {
@@ -68,20 +73,34 @@ impl CallStatsAccumulator {
             verdict_unsure: 0,
             provider_errors: 0,
             latencies_ms: Vec::new(),
+            verdict_log: Vec::new(),
         }
     }
 
-    fn record(&mut self, result: &LlmCallResult, latency_ms: f64) {
+    fn record(&mut self, result: &LlmCallResult, latency_ms: f64, candidate_id: &str) {
         self.call_count += 1;
         self.latencies_ms.push(latency_ms);
-        match result {
-            LlmCallResult::Verdict(v) => match v.verdict {
-                VerdictKind::Match => self.verdict_match += 1,
-                VerdictKind::NoMatch => self.verdict_no_match += 1,
-                VerdictKind::Unsure => self.verdict_unsure += 1,
-            },
-            LlmCallResult::ProviderError { .. } => self.provider_errors += 1,
-        }
+        let (verdict_str, reasoning) = match result {
+            LlmCallResult::Verdict(v) => {
+                let vs = v.verdict.as_str().to_string();
+                match v.verdict {
+                    VerdictKind::Match => self.verdict_match += 1,
+                    VerdictKind::NoMatch => self.verdict_no_match += 1,
+                    VerdictKind::Unsure => self.verdict_unsure += 1,
+                }
+                (vs, v.reasoning.clone())
+            }
+            LlmCallResult::ProviderError { message, .. } => {
+                self.provider_errors += 1;
+                ("provider_error".into(), message.clone())
+            }
+        };
+        self.verdict_log.push(LlmVerdictLogEntry {
+            candidate_id: candidate_id.to_string(),
+            verdict: verdict_str,
+            reasoning,
+            latency_ms: (latency_ms * 1000.0).round() / 1000.0,
+        });
     }
 
     fn finish(self) -> LlmCallStats {
@@ -115,6 +134,11 @@ impl CallStatsAccumulator {
             latency_ms_min: min,
             latency_ms_max: max,
             latency_ms_mean: mean,
+            verdict_log: if self.verdict_log.is_empty() {
+                None
+            } else {
+                Some(self.verdict_log)
+            },
         }
     }
 }
@@ -364,14 +388,38 @@ pub async fn llm_resolve(
     };
 
     let mut stats = CallStatsAccumulator::new();
+    let model_name = options.llm_model.as_deref().unwrap_or("llama3.2");
+    let mut cache = if options.llm_cache {
+        Some(VerdictCache::load(
+            options
+                .llm_cache_path
+                .clone()
+                .unwrap_or_else(|| PathBuf::from("output/llm-cache.json")),
+        ))
+    } else {
+        None
+    };
 
     // Ollama serves one request at a time on typical local installs — keep sequential.
     for a in ambiguous {
         let is_split = a.kind == Some(AmbiguousKind::Split)
             && a.split_options.as_ref().is_some_and(|o| !o.is_empty());
 
-        let (call_result, latency_ms) = resolve_with_retry_timed(provider.as_ref(), a).await;
-        stats.record(&call_result, latency_ms);
+        let label = candidate_label(a);
+        let (call_result, latency_ms) = if let Some(ref cache_ref) = cache {
+            if let Some(cached) = cache_ref.get(a, model_name, options.seed) {
+                (LlmCallResult::Verdict(cached), 0.0)
+            } else {
+                let (result, lat) = resolve_with_retry_timed(provider.as_ref(), a).await;
+                if let Some(ref mut c) = cache {
+                    c.insert_from_result(a, model_name, options.seed, &result);
+                }
+                (result, lat)
+            }
+        } else {
+            resolve_with_retry_timed(provider.as_ref(), a).await
+        };
+        stats.record(&call_result, latency_ms, &label);
 
         match call_result {
             LlmCallResult::Verdict(verdict) => match verdict.verdict {
@@ -452,6 +500,10 @@ pub async fn llm_resolve(
                 push_provider_error_exceptions(&mut exceptions, a, &message, is_split);
             }
         }
+    }
+
+    if let Some(ref mut cache) = cache {
+        let _ = cache.save_if_dirty();
     }
 
     LlmResolveResult {

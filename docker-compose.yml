@@ -1,0 +1,20 @@
+services:
+  engine:
+    build: .
+    image: settlesure
+    volumes:
+      - ./output:/app/output
+      - ./data:/app/data
+    command: ["--seed", "42", "--skip-llm", "--no-banner"]
+
+  dashboard:
+    image: node:22-bookworm-slim
+    working_dir: /app/dashboard
+    volumes:
+      - ./dashboard:/app/dashboard
+      - ./output/report.json:/app/dashboard/public/report.json
+    ports:
+      - "5173:5173"
+    command: ["sh", "-c", "npm ci && npm run dev -- --host 0.0.0.0"]
+    depends_on:
+      - engine

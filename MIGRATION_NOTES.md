@@ -57,6 +57,10 @@ Result: `--skip-llm` leaves 7 GT matches in the LLM tier; `--compare-llm` is the
 
 Prior to transport hardening, 7/9 ambiguous cases failed with connection errors mislabeled as `"ambiguous — LLM error"`.
 
+**Anthropic:** HTTP client + error mapping are unit-tested; **live ablation not run in CI by default**. Optional: `npm run ablation-anthropic` when `ANTHROPIC_API_KEY` is set.
+
+**Structured LLM output:** Ollama requests use JSON-schema `format`; verdicts are cached in `output/llm-cache.json` (keyed by candidate hash + model + seed) unless `--no-llm-cache`.
+
 ## Throughput benchmark methodology
 
 Side-by-side comparison against a **TS oracle worktree** (last pre-deletion commit) on **identical pre-generated fixtures**.

@@ -18,3 +18,25 @@ jobs:
       - run: cargo run -p settlesure-cli -- --seed 42 --skip-llm --no-banner
       - name: Regression guard vs baseline
         run: node scripts/check-baseline.mjs
+
+  # Optional — never blocks merge; runs when Ollama is reachable on the runner.
+  llm-ablation:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Install Ollama (best-effort)
+        continue-on-error: true
+        run: |
+          curl -fsSL https://ollama.com/install.sh | sh
+          ollama serve &
+          sleep 5
+          ollama pull llama3.2
+      - name: Multi-seed LLM ablation
+        continue-on-error: true
+        run: npm run ablation-seeds
+      - name: Soft ablation gate
+        continue-on-error: true
+        run: npm run check-ablation-seeds

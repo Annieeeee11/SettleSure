@@ -42,13 +42,69 @@ fn run_cell(opts: GenerateDatasetOpts) -> (String, String, String, String) {
     )
 }
 
+/// Accept-band decoy bait must cross the fuzzy accept threshold at generation time.
+#[test]
+fn accept_band_decoys_cross_threshold() {
+    use settlesure_engine::score_pair;
+    use settlesure_types::{DiscrepancyClass, GroundTruthLabelKind, DEFAULT_CONFIG};
+
+    let dataset = generate_dataset(42, GenerateDatasetOpts::default()).expect("generate");
+    let accept_classes = [
+        DiscrepancyClass::AcceptBandDecoyAmountUtr,
+        DiscrepancyClass::AcceptBandDecoyUtrAmountTol,
+        DiscrepancyClass::AcceptBandDecoyDateWrongRef,
+    ];
+    for cls in accept_classes {
+        let decoy_labels: Vec<_> = dataset
+            .ground_truth
+            .iter()
+            .filter(|g| g.exception_type == Some(cls))
+            .collect();
+        assert_eq!(decoy_labels.len(), 1, "expected one decoy row for {cls:?}");
+        let decoy_id = decoy_labels[0].settlement_id.as_ref().unwrap();
+        let decoy = dataset
+            .settlements
+            .iter()
+            .find(|s| &s.settlement_id == decoy_id)
+            .expect("decoy settlement");
+        let match_label = dataset
+            .ground_truth
+            .iter()
+            .find(|g| g.decoy_settlement_id.as_deref() == Some(decoy_id.as_str()))
+            .expect("match row with decoy_settlement_id");
+        let bank_id = match_label.bank_credit_id.as_ref().unwrap();
+        let bank = dataset
+            .bank_credits
+            .iter()
+            .find(|b| &b.id == bank_id)
+            .expect("bank credit");
+        let (score, _, _) = score_pair(bank, decoy, &DEFAULT_CONFIG);
+        assert!(
+            score >= DEFAULT_CONFIG.fuzzy_accept_threshold,
+            "{cls:?} decoy score {score:.4} below accept threshold"
+        );
+        let true_id = match_label.settlement_id.as_ref().unwrap();
+        let true_setl = dataset
+            .settlements
+            .iter()
+            .find(|s| &s.settlement_id == true_id)
+            .expect("true settlement");
+        let (true_score, _, _) = score_pair(bank, true_setl, &DEFAULT_CONFIG);
+        assert!(
+            true_score > score + 0.01,
+            "{cls:?} true {true_score:.4} must beat decoy {score:.4}"
+        );
+        assert_eq!(match_label.label, GroundTruthLabelKind::Match);
+    }
+}
+
 #[test]
 fn decoy_sweep_default_cell_defers_all() {
     let (deferred, fp, precision, recall) = run_cell(GenerateDatasetOpts::default());
-    assert_eq!(deferred, "16/16");
+    assert_eq!(deferred, "22/22");
     assert_eq!(fp, "0.00%");
     assert_eq!(precision, "100.00%");
-    assert!(recall.starts_with("84.") || recall.starts_with("82."));
+    assert!(recall.starts_with("85.") || recall.starts_with("84.") || recall.starts_with("82."));
 }
 
 /// Writes `output/decoy-sweep.md` when RUN_SWEEP=1 (manual / CI optional).

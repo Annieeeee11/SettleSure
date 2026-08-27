@@ -14,8 +14,9 @@ use settlesure_scoring::{
 use settlesure_scoring::score_against_ground_truth;
 use settlesure_types::{
     AmbiguityLevel, Correction, FullReport, GroundTruthLabel, GroundTruthLabelKind,
-    LlmAblationSide, LlmAblationSummary, LlmProviderChoice, MatchResult, MetricRange,
-    ReconcileConfig, RobustnessSummary, ScoreReport, Secret, Settlement, DEFAULT_CONFIG,
+    LlmAblationRobustnessSummary, LlmAblationSide, LlmAblationSummary, LlmProviderChoice,
+    MatchResult, MetricRange, ReconcileConfig, RobustnessSummary, ScoreReport, Secret,
+    Settlement, DEFAULT_CONFIG,
 };
 use std::collections::HashMap;
 use std::fs;
@@ -63,6 +64,14 @@ struct Args {
     #[arg(long)]
     compare_llm: bool,
 
+    /// Use output/llm-cache.json for LLM verdict caching (default on)
+    #[arg(long, default_value_t = true)]
+    llm_cache: bool,
+
+    /// Disable LLM verdict cache (fresh model calls)
+    #[arg(long)]
+    no_llm_cache: bool,
+
     /// Skip the startup logo (also skipped when not a TTY)
     #[arg(long)]
     no_banner: bool,
@@ -107,6 +116,7 @@ struct AppConfig {
     apply_corrections: bool,
     runs: u32,
     compare_llm: bool,
+    llm_cache: bool,
     no_banner: bool,
     dump_matches: Option<String>,
     batch_scale: u32,
@@ -140,6 +150,7 @@ impl AppConfig {
             apply_corrections: args.apply_corrections,
             runs: args.runs.max(1),
             compare_llm: args.compare_llm,
+            llm_cache: args.llm_cache && !args.no_llm_cache,
             no_banner: args.no_banner,
             dump_matches: args.dump_matches,
             batch_scale: args.batch_scale.max(1),
@@ -179,13 +190,20 @@ impl AppConfig {
         cfg
     }
 
-    fn llm_select(&self, skip: bool, provider: Option<LlmProviderChoice>) -> LlmSelectOptions {
+    fn llm_select(
+        &self,
+        skip: bool,
+        provider: Option<LlmProviderChoice>,
+        seed: u32,
+    ) -> LlmSelectOptions {
         LlmSelectOptions {
             skip_llm: skip,
             llm_provider: provider,
             llm_model: Some(self.llm_model.clone()),
-            seed: self.seed,
+            seed,
             anthropic_api_key: self.anthropic_api_key.clone(),
+            llm_cache: self.llm_cache,
+            llm_cache_path: Some(self.output_dir().join("llm-cache.json")),
         }
     }
 }
@@ -324,7 +342,7 @@ async fn run_once(
     cfg.llm_provider = llm_provider;
     cfg.llm_model = Some(app.llm_model.clone());
 
-    let select_opts = app.llm_select(skip_llm, llm_provider);
+    let select_opts = app.llm_select(skip_llm, llm_provider, seed);
     let selected_name = select_llm_provider(&select_opts).await.name;
 
     let mut llm_call_stats = None;
@@ -336,7 +354,7 @@ async fn run_once(
         corrections,
         |ambiguous| {
             // Bridge async LLM into sync engine callback via current runtime.
-            let opts = app.llm_select(skip_llm, llm_provider);
+            let opts = app.llm_select(skip_llm, llm_provider, seed);
             let ambiguous = ambiguous.to_vec();
             let rt_result = tokio::task::block_in_place(|| {
                 tokio::runtime::Handle::current()
@@ -443,6 +461,108 @@ async fn run(app: AppConfig) -> Result<(), settlesure_types::SettleSureError> {
     } else {
         Vec::new()
     };
+
+    if app.compare_llm && app.runs > 1 {
+        eprintln!(
+            "LLM ablation robustness: {} seeds starting at {}...",
+            app.runs, app.seed
+        );
+        let provider_for_with = if app.llm_provider == Some(LlmProviderChoice::None) {
+            None
+        } else {
+            app.llm_provider
+        };
+        let mut seeds = Vec::new();
+        let mut recall_lifts = Vec::new();
+        let mut with_recalls = Vec::new();
+        let mut without_recalls = Vec::new();
+        let mut llm_match_counts = Vec::new();
+        let mut per_seed = Vec::new();
+        let mut last_full: Option<FullReport> = None;
+
+        for i in 0..app.runs {
+            let s = app.seed + i;
+            seeds.push(s);
+            let corr = if i == 0 { corrections.as_slice() } else { &[] };
+            let (with_metrics, mut with_full, with_name, with_call_stats) = run_once(
+                &app,
+                s,
+                false,
+                provider_for_with,
+                corr,
+            )
+            .await?;
+            let (without_metrics, _, _, _) = run_once(
+                &app,
+                s,
+                true,
+                Some(LlmProviderChoice::None),
+                corr,
+            )
+            .await?;
+            let lift = with_metrics.recall - without_metrics.recall;
+            recall_lifts.push(lift);
+            with_recalls.push(with_metrics.recall);
+            without_recalls.push(without_metrics.recall);
+            llm_match_counts.push(with_metrics.match_source_breakdown.llm as f64);
+            let ablation = LlmAblationSummary {
+                provider_available: with_name != "none",
+                with_llm: LlmAblationSide {
+                    match_rate: with_metrics.match_rate,
+                    precision: with_metrics.precision,
+                    recall: with_metrics.recall,
+                    false_positive_rate: with_metrics.false_positive_rate,
+                    llm_matches: with_metrics.match_source_breakdown.llm,
+                    provider: Some(with_name),
+                },
+                without_llm: LlmAblationSide {
+                    match_rate: without_metrics.match_rate,
+                    precision: without_metrics.precision,
+                    recall: without_metrics.recall,
+                    false_positive_rate: without_metrics.false_positive_rate,
+                    llm_matches: without_metrics.match_source_breakdown.llm,
+                    provider: None,
+                },
+                call_stats: with_call_stats,
+            };
+            per_seed.push(ablation);
+            with_full.metrics.llm_ablation = Some(per_seed.last().unwrap().clone());
+            last_full = Some(with_full);
+            eprintln!(
+                "  seed {s}: recall lift {:.1}% (with {:.1}% / without {:.1}%)",
+                lift * 100.0,
+                with_metrics.recall * 100.0,
+                without_metrics.recall * 100.0
+            );
+        }
+
+        let mut full = last_full.ok_or_else(|| {
+            settlesure_types::SettleSureError::Message("no ablation runs".into())
+        })?;
+        full.metrics.llm_ablation_robustness = Some(LlmAblationRobustnessSummary {
+            seeds: seeds.clone(),
+            recall_lift: mean_min_max(&recall_lifts),
+            with_llm_recall: mean_min_max(&with_recalls),
+            without_llm_recall: mean_min_max(&without_recalls),
+            llm_matches: mean_min_max(&llm_match_counts),
+            per_seed: Some(per_seed),
+        });
+        let (json_path, md_path, _) = write_report(&full, &app.output_dir())?;
+        copy_report_to_dashboard(&app.root, &json_path);
+        let json_s = json_path.to_string_lossy();
+        let md_s = md_path.to_string_lossy();
+        println!(
+            "{}",
+            format_terminal(
+                &full,
+                Some(ReportPaths {
+                    json_path: Some(json_s.as_ref()),
+                    md_path: Some(md_s.as_ref()),
+                })
+            )
+        );
+        return Ok(());
+    }
 
     if app.runs > 1 {
         eprintln!(

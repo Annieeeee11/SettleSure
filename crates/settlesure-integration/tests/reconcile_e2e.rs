@@ -44,7 +44,7 @@ fn seed42_skip_llm_meets_baseline_gates() {
         assert_eq!(decoy.correctly_deferred, decoy.deferred_total);
     }
 
-    assert_eq!(metrics.match_source_breakdown.exact, 20);
+    assert_eq!(metrics.match_source_breakdown.exact, 23);
     assert_eq!(metrics.match_source_breakdown.fuzzy, 17);
     assert_eq!(metrics.match_source_breakdown.split, 2);
     assert_eq!(metrics.match_source_breakdown.llm, 0);
@@ -52,8 +52,14 @@ fn seed42_skip_llm_meets_baseline_gates() {
 }
 
 #[test]
-fn seed42_does_not_split_match_duplicate_bank_0057() {
+fn seed42_does_not_split_match_duplicate_bank() {
     let dataset = generate_dataset(42, Default::default()).expect("generate");
+    let dup_bank_id = dataset
+        .ground_truth
+        .iter()
+        .find(|g| g.exception_type == Some(settlesure_types::DiscrepancyClass::DuplicateBank))
+        .and_then(|g| g.bank_credit_id.clone())
+        .expect("duplicate bank GT row");
     let mut cfg = DEFAULT_CONFIG.clone();
     cfg.skip_llm = true;
     cfg.seed = Some(42);
@@ -68,13 +74,13 @@ fn seed42_does_not_split_match_duplicate_bank_0057() {
     assert!(!result
         .matches
         .iter()
-        .any(|m| m.bank_credit_id == "bank_0057"));
+        .any(|m| m.bank_credit_id == dup_bank_id));
 
     let ex = result
         .exceptions
         .iter()
-        .find(|e| e.record_id == "bank_0057")
-        .expect("bank_0057 exception");
+        .find(|e| e.record_id == dup_bank_id)
+        .expect("duplicate bank exception");
     assert_eq!(
         ex.exception_type,
         Some(settlesure_types::DiscrepancyClass::DuplicateBank)
