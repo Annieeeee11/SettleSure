@@ -320,16 +320,16 @@ fn push_provider_error_exceptions(
     exceptions: &mut Vec<Exception>,
     a: &AmbiguousCandidate,
     message: &str,
-    is_split: bool,
+    split_options: Option<&[Vec<String>]>,
 ) {
     let reason = format!("LLM unavailable — provider error: {message}");
-    if is_split {
+    if let Some(opts) = split_options {
         exceptions.push(Exception {
             record_id: a.bank.id.clone(),
             source: ExceptionSource::Bank,
             reason,
             exception_type: Some(DiscrepancyClass::BatchedPayout),
-            related_ids: Some(unique_flat(a.split_options.as_ref().unwrap())),
+            related_ids: Some(unique_flat(opts)),
         });
     } else {
         push_pair_exceptions(
@@ -346,29 +346,27 @@ fn push_declined_exceptions(
     exceptions: &mut Vec<Exception>,
     a: &AmbiguousCandidate,
     reasoning: &str,
-    is_split: bool,
+    split_options: Option<&[Vec<String>]>,
 ) {
-    let reason = if is_split {
-        format!("ambiguous — LLM declined (split) — {reasoning}")
-    } else {
-        format!("ambiguous — LLM declined — {reasoning}")
-    };
-    if is_split {
-        exceptions.push(Exception {
-            record_id: a.bank.id.clone(),
-            source: ExceptionSource::Bank,
-            reason,
-            exception_type: Some(DiscrepancyClass::BatchedPayout),
-            related_ids: Some(unique_flat(a.split_options.as_ref().unwrap())),
-        });
-    } else {
-        push_pair_exceptions(
-            exceptions,
-            &a.bank.id,
-            &a.settlement.settlement_id,
-            &reason,
-            &rival_ids(a),
-        );
+    match split_options {
+        Some(opts) => {
+            exceptions.push(Exception {
+                record_id: a.bank.id.clone(),
+                source: ExceptionSource::Bank,
+                reason: format!("ambiguous — LLM declined (split) — {reasoning}"),
+                exception_type: Some(DiscrepancyClass::BatchedPayout),
+                related_ids: Some(unique_flat(opts)),
+            });
+        }
+        None => {
+            push_pair_exceptions(
+                exceptions,
+                &a.bank.id,
+                &a.settlement.settlement_id,
+                &format!("ambiguous — LLM declined — {reasoning}"),
+                &rival_ids(a),
+            );
+        }
     }
 }
 
@@ -401,25 +399,27 @@ pub async fn llm_resolve(
 
     let Some(provider) = provider else {
         for a in ambiguous {
-            if a.kind == Some(AmbiguousKind::Split) && a.split_options.is_some() {
-                let all_ids = unique_flat(a.split_options.as_ref().unwrap());
-                exceptions.push(Exception {
-                    record_id: a.bank.id.clone(),
-                    source: ExceptionSource::Bank,
-                    reason: format!("ambiguous split — LLM unavailable: {}", a.reasoning),
-                    exception_type: Some(DiscrepancyClass::BatchedPayout),
-                    related_ids: Some(all_ids),
-                });
-            } else {
-                let related_extra = rival_ids(a);
-                push_pair_exceptions(
-                    &mut exceptions,
-                    &a.bank.id,
-                    &a.settlement.settlement_id,
-                    "ambiguous — LLM unavailable",
-                    &related_extra,
-                );
+            if a.kind == Some(AmbiguousKind::Split) {
+                if let Some(split_options) = a.split_options.as_ref() {
+                    let all_ids = unique_flat(split_options);
+                    exceptions.push(Exception {
+                        record_id: a.bank.id.clone(),
+                        source: ExceptionSource::Bank,
+                        reason: format!("ambiguous split — LLM unavailable: {}", a.reasoning),
+                        exception_type: Some(DiscrepancyClass::BatchedPayout),
+                        related_ids: Some(all_ids),
+                    });
+                    continue;
+                }
             }
+            let related_extra = rival_ids(a);
+            push_pair_exceptions(
+                &mut exceptions,
+                &a.bank.id,
+                &a.settlement.settlement_id,
+                "ambiguous — LLM unavailable",
+                &related_extra,
+            );
         }
         return LlmResolveResult {
             matches,
@@ -445,8 +445,11 @@ pub async fn llm_resolve(
 
     // Ollama serves one request at a time on typical local installs — keep sequential.
     for a in ambiguous {
-        let is_split = a.kind == Some(AmbiguousKind::Split)
-            && a.split_options.as_ref().is_some_and(|o| !o.is_empty());
+        let split_options: Option<&[Vec<String>]> = if a.kind == Some(AmbiguousKind::Split) {
+            a.split_options.as_deref().filter(|o| !o.is_empty())
+        } else {
+            None
+        };
 
         let label = candidate_label(a);
         let (call_result, latency_ms) = if let Some(ref cache_ref) = cache {
@@ -467,37 +470,38 @@ pub async fn llm_resolve(
         match call_result {
             LlmCallResult::Verdict(verdict) => match verdict.verdict {
                 VerdictKind::Match => {
-                    if is_split {
-                        let split_options = a.split_options.as_ref().unwrap();
-                        if is_valid_split_choice(
-                            verdict.chosen_settlement_ids.as_deref(),
-                            split_options,
-                        ) {
-                            let mut components = verdict.chosen_settlement_ids.unwrap();
-                            components.sort();
-                            let settlement_id = components[0].clone();
-                            matches.push(MatchResult {
-                                bank_credit_id: a.bank.id.clone(),
-                                settlement_id,
-                                components: Some(components),
-                                confidence: a.score.max(0.8),
-                                matched_by: MatchSource::Llm,
-                                reasoning: Some(format!(
-                                    "LLM verdict: match (split) — {}",
-                                    verdict.reasoning
-                                )),
-                            });
-                        } else {
-                            exceptions.push(Exception {
-                                record_id: a.bank.id.clone(),
-                                source: ExceptionSource::Bank,
-                                reason: format!(
-                                    "LLM verdict: match but invalid/missing chosenSettlementIds — {}",
-                                    verdict.reasoning
-                                ),
-                                exception_type: Some(DiscrepancyClass::BatchedPayout),
-                                related_ids: Some(unique_flat(split_options)),
-                            });
+                    if let Some(split_options) = split_options {
+                        match verdict
+                            .chosen_settlement_ids
+                            .filter(|c| is_valid_split_choice(Some(c), split_options))
+                        {
+                            Some(mut components) => {
+                                components.sort();
+                                let settlement_id = components[0].clone();
+                                matches.push(MatchResult {
+                                    bank_credit_id: a.bank.id.clone(),
+                                    settlement_id,
+                                    components: Some(components),
+                                    confidence: a.score.max(0.8),
+                                    matched_by: MatchSource::Llm,
+                                    reasoning: Some(format!(
+                                        "LLM verdict: match (split) — {}",
+                                        verdict.reasoning
+                                    )),
+                                });
+                            }
+                            None => {
+                                exceptions.push(Exception {
+                                    record_id: a.bank.id.clone(),
+                                    source: ExceptionSource::Bank,
+                                    reason: format!(
+                                        "LLM verdict: match but invalid/missing chosenSettlementIds — {}",
+                                        verdict.reasoning
+                                    ),
+                                    exception_type: Some(DiscrepancyClass::BatchedPayout),
+                                    related_ids: Some(unique_flat(split_options)),
+                                });
+                            }
                         }
                     } else {
                         matches.push(MatchResult {
@@ -514,7 +518,7 @@ pub async fn llm_resolve(
                     }
                 }
                 VerdictKind::NoMatch => {
-                    if is_split {
+                    if let Some(split_options) = split_options {
                         exceptions.push(Exception {
                             record_id: a.bank.id.clone(),
                             source: ExceptionSource::Bank,
@@ -523,7 +527,7 @@ pub async fn llm_resolve(
                                 verdict.reasoning
                             ),
                             exception_type: Some(DiscrepancyClass::BatchedPayout),
-                            related_ids: Some(unique_flat(a.split_options.as_ref().unwrap())),
+                            related_ids: Some(unique_flat(split_options)),
                         });
                     } else {
                         push_pair_exceptions(
@@ -536,11 +540,11 @@ pub async fn llm_resolve(
                     }
                 }
                 VerdictKind::Unsure => {
-                    push_declined_exceptions(&mut exceptions, a, &verdict.reasoning, is_split);
+                    push_declined_exceptions(&mut exceptions, a, &verdict.reasoning, split_options);
                 }
             },
             LlmCallResult::ProviderError { message, .. } => {
-                push_provider_error_exceptions(&mut exceptions, a, &message, is_split);
+                push_provider_error_exceptions(&mut exceptions, a, &message, split_options);
             }
         }
     }

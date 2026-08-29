@@ -135,17 +135,17 @@ pub fn score_slice(
                         | DiscrepancyClass::AcceptBandDecoyUtrAmountTol
                         | DiscrepancyClass::AcceptBandDecoyDateWrongRef
                 )
-            ) && g.settlement_id.is_some()
-            {
-                let sid = g.settlement_id.as_ref().unwrap();
-                let decoy_picked = result.matches.iter().any(|m| {
-                    m.settlement_id == *sid
-                        || m.components
-                            .as_ref()
-                            .is_some_and(|c| c.iter().any(|id| id == sid))
-                });
-                if !decoy_picked {
-                    correctly_deferred += 1;
+            ) {
+                if let Some(sid) = g.settlement_id.as_ref() {
+                    let decoy_picked = result.matches.iter().any(|m| {
+                        m.settlement_id == *sid
+                            || m.components
+                                .as_ref()
+                                .is_some_and(|c| c.iter().any(|id| id == sid))
+                    });
+                    if !decoy_picked {
+                        correctly_deferred += 1;
+                    }
                 }
                 continue;
             }

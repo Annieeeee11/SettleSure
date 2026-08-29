@@ -447,48 +447,45 @@ pub fn reconcile_skip_llm(
         |ambiguous| {
             let mut exceptions = Vec::new();
             for a in ambiguous {
-                if a.kind == Some(settlesure_types::AmbiguousKind::Split)
-                    && a.split_options.is_some()
-                {
-                    let all_ids: Vec<String> = a
-                        .split_options
-                        .as_ref()
-                        .unwrap()
-                        .iter()
-                        .flatten()
-                        .cloned()
-                        .collect::<HashSet<_>>()
-                        .into_iter()
-                        .collect();
-                    exceptions.push(Exception {
-                        record_id: a.bank.id.clone(),
-                        source: ExceptionSource::Bank,
-                        reason: format!("ambiguous split — LLM unavailable: {}", a.reasoning),
-                        exception_type: Some(DiscrepancyClass::BatchedPayout),
-                        related_ids: Some(all_ids),
-                    });
-                } else {
-                    let mut related = vec![a.settlement.settlement_id.clone()];
-                    if let Some(ref rivals) = a.rivals {
-                        for r in rivals {
-                            related.push(r.settlement.settlement_id.clone());
-                        }
+                if a.kind == Some(settlesure_types::AmbiguousKind::Split) {
+                    if let Some(split_options) = a.split_options.as_ref() {
+                        let all_ids: Vec<String> = split_options
+                            .iter()
+                            .flatten()
+                            .cloned()
+                            .collect::<HashSet<_>>()
+                            .into_iter()
+                            .collect();
+                        exceptions.push(Exception {
+                            record_id: a.bank.id.clone(),
+                            source: ExceptionSource::Bank,
+                            reason: format!("ambiguous split — LLM unavailable: {}", a.reasoning),
+                            exception_type: Some(DiscrepancyClass::BatchedPayout),
+                            related_ids: Some(all_ids),
+                        });
+                        continue;
                     }
-                    exceptions.push(Exception {
-                        record_id: a.bank.id.clone(),
-                        source: ExceptionSource::Bank,
-                        reason: "ambiguous — LLM unavailable".into(),
-                        exception_type: None,
-                        related_ids: Some(related.clone()),
-                    });
-                    exceptions.push(Exception {
-                        record_id: a.settlement.settlement_id.clone(),
-                        source: ExceptionSource::Settlement,
-                        reason: "ambiguous — LLM unavailable".into(),
-                        exception_type: None,
-                        related_ids: Some(vec![a.bank.id.clone()]),
-                    });
                 }
+                let mut related = vec![a.settlement.settlement_id.clone()];
+                if let Some(ref rivals) = a.rivals {
+                    for r in rivals {
+                        related.push(r.settlement.settlement_id.clone());
+                    }
+                }
+                exceptions.push(Exception {
+                    record_id: a.bank.id.clone(),
+                    source: ExceptionSource::Bank,
+                    reason: "ambiguous — LLM unavailable".into(),
+                    exception_type: None,
+                    related_ids: Some(related.clone()),
+                });
+                exceptions.push(Exception {
+                    record_id: a.settlement.settlement_id.clone(),
+                    source: ExceptionSource::Settlement,
+                    reason: "ambiguous — LLM unavailable".into(),
+                    exception_type: None,
+                    related_ids: Some(vec![a.bank.id.clone()]),
+                });
             }
             LlmPassResult {
                 matches: vec![],
