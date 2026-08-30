@@ -1,32 +1,40 @@
-# React + TypeScript + Vite
+# SettleSure Dashboard
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+React + Vite ops view for reconciliation reports. Reads `public/report.json` (sync from repo root via `npm run sync-report`).
 
-Currently, two official plugins are available:
+## Run locally
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
-
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+```bash
+# From repo root — regenerate baseline report first
+npm run sync-report
+npm run dashboard   # http://localhost:5173
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+If the dashboard shows stale metrics (e.g. Human > 0 on a skip-llm baseline), re-run `npm run sync-report` from the repo root.
+
+## Panels
+
+| Panel | Content |
+| --- | --- |
+| Headline metrics | Match rate, precision, recall, FP rate, throughput |
+| By difficulty | Clear / boundary / decoy / unresolvable slices |
+| Match sources | Exact / fuzzy / split / LLM / human bar chart |
+| LLM ablation | Side-by-side when `metrics.llmAblation` is present (use `report-llm.json` or `--compare-llm` output) |
+| Exceptions | Filterable list with Accept/Reject and reason expansion |
+| Matches | Inspector with pass, confidence, and reasoning |
+
+## Human loop (dev only)
+
+- **Accept** on an exception → writes to `output/corrections.json`
+- **Re-run with corrections** → shells out to `cargo run ... --apply-corrections` and refreshes `public/report.json`
+
+Note: corrections demo intentionally may lower precision (FP by design on GT-exception rows). Do not use this run for Track 04 headline screenshots.
+
+## Dev API (`vite.config.ts`)
+
+| Route | Method | Purpose |
+| --- | --- | --- |
+| `/api/corrections` | GET/POST | Read/write corrections file |
+| `/api/rerun` | POST | Reconcile with corrections applied |
+
+Requires local Rust toolchain for `/api/rerun`. Docker Compose runs engine + dashboard separately (see root README).

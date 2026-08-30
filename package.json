@@ -10,6 +10,7 @@
     "test": "cargo test --workspace",
     "dashboard": "npm run dev --prefix dashboard",
     "check-baseline": "node scripts/check-baseline.mjs",
+    "sync-report": "node scripts/sync-dashboard-report.mjs",
     "check-ablation-seeds": "node scripts/check-ablation-seeds.mjs",
     "ablation-seeds": "cargo run -p settlesure-cli -- --seed 42 --runs 5 --compare-llm --llm-provider ollama --llm-model llama3.2 --no-banner",
     "ablation-models-help": "echo 'Manual per-model ablation (not automated). Example: cargo run --release -p settlesure-cli -- --seed 42 --compare-llm --llm-provider ollama --llm-model <name> --no-llm-cache --no-banner'",
