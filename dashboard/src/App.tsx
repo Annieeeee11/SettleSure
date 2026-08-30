@@ -5,6 +5,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import type {
   AmbiguityLevel,
@@ -63,16 +64,26 @@ const fadeUp = {
   }),
 };
 
-const pageFade = {
-  enter: { opacity: 0 },
+const pageSlide = {
+  enter: (dir: number) => ({
+    opacity: 0,
+    x: dir >= 0 ? 32 : -32,
+  }),
   center: {
     opacity: 1,
-    transition: { duration: 0.12, ease: [0.25, 0.1, 0.25, 1] as const },
+    x: 0,
+    transition: {
+      type: "spring" as const,
+      stiffness: 440,
+      damping: 36,
+      mass: 0.75,
+    },
   },
-  exit: {
+  exit: (dir: number) => ({
     opacity: 0,
-    transition: { duration: 0.08, ease: [0.4, 0, 1, 1] as const },
-  },
+    x: dir >= 0 ? -32 : 32,
+    transition: { duration: 0.16, ease: [0.4, 0, 0.8, 0.2] as const },
+  }),
 };
 
 function friendlyError(message: string): string {
@@ -155,7 +166,14 @@ function Pagination({
               className={`page-btn ${n === page ? "active" : ""}`}
               onClick={() => onChange(n)}
             >
-              {n}
+              {n === page && (
+                <motion.span
+                  className="page-indicator"
+                  layoutId={`${id}-page-indicator`}
+                  transition={{ type: "spring", stiffness: 400, damping: 30 }}
+                />
+              )}
+              <span className="page-btn-label">{n}</span>
             </button>
           ),
         )}
@@ -186,12 +204,17 @@ export default function App() {
   const [rerunning, setRerunning] = useState(false);
   const [excPage, setExcPage] = useState(1);
   const [matchPage, setMatchPage] = useState(1);
+  const [excDirection, setExcDirection] = useState(1);
+  const [matchDirection, setMatchDirection] = useState(1);
+
   function goExcPage(next: number) {
+    setExcDirection(next >= excPage ? 1 : -1);
     setExcPage(next);
     setSelectedException(null);
   }
 
   function goMatchPage(next: number) {
+    setMatchDirection(next >= matchPage ? 1 : -1);
     setMatchPage(next);
   }
 
@@ -229,6 +252,7 @@ export default function App() {
 
   useEffect(() => {
     setExcPage(1);
+    setExcDirection(1);
     setSelectedException(null);
   }, [filter, sortKey]);
 
@@ -604,8 +628,13 @@ export default function App() {
             className={tab === id ? "active" : ""}
             onClick={() => {
               setTab(id);
-              if (id === "exceptions") setExcPage(1);
-              else setMatchPage(1);
+              if (id === "exceptions") {
+                setExcPage(1);
+                setExcDirection(1);
+              } else {
+                setMatchPage(1);
+                setMatchDirection(1);
+              }
             }}
           >
             {tab === id && (
@@ -652,74 +681,78 @@ export default function App() {
               />
             </div>
             <div className="table-wrap table-scroll">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Record</th>
-                    <th>Source</th>
-                    <th>Type</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <AnimatePresence mode="wait">
-                  <motion.tbody
-                    key={excPage}
-                    variants={pageFade}
-                    initial="enter"
-                    animate="center"
-                    exit="exit"
-                  >
-                    {paginatedExceptions.map((e) => {
-                      const key = `${e.source}:${e.recordId}`;
-                      const selected =
-                        selectedException?.recordId === e.recordId &&
-                        selectedException?.source === e.source;
-                      const queued = pending[key];
-                      return (
-                        <tr
-                          key={key}
-                          className={`clickable ${queued ? "row-pending" : ""} ${selected ? "selected" : ""}`}
-                          onClick={() =>
-                            setSelectedException(selected ? null : e)
-                          }
-                        >
-                          <td>{e.recordId}</td>
-                          <td>{e.source}</td>
-                          <td>{e.exceptionType ?? "—"}</td>
-                          <td onClick={(ev) => ev.stopPropagation()}>
-                            {queued ? (
-                              <span className="pending-tag">
-                                Pending re-run ({queued.decision})
-                              </span>
-                            ) : (
-                              <>
-                                <motion.button
-                                  className="btn accept"
-                                  onClick={() =>
-                                    void sendCorrection(e, "accept")
-                                  }
-                                  whileTap={{ scale: 0.95 }}
-                                >
-                                  Accept
-                                </motion.button>
-                                <motion.button
-                                  className="btn reject"
-                                  onClick={() =>
-                                    void sendCorrection(e, "reject")
-                                  }
-                                  whileTap={{ scale: 0.95 }}
-                                >
-                                  Reject
-                                </motion.button>
-                              </>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </motion.tbody>
-                </AnimatePresence>
-              </table>
+                <AnimatePresence mode="wait" initial={false} custom={excDirection}>
+                <motion.div
+                  key={excPage}
+                  className="table-page"
+                  custom={excDirection}
+                  variants={pageSlide}
+                  initial="enter"
+                  animate="center"
+                  exit="exit"
+                >
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Record</th>
+                        <th>Source</th>
+                        <th>Type</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {paginatedExceptions.map((e) => {
+                        const key = `${e.source}:${e.recordId}`;
+                        const selected =
+                          selectedException?.recordId === e.recordId &&
+                          selectedException?.source === e.source;
+                        const queued = pending[key];
+                        return (
+                          <tr
+                            key={key}
+                            className={`clickable ${queued ? "row-pending" : ""} ${selected ? "selected" : ""}`}
+                            onClick={() =>
+                              setSelectedException(selected ? null : e)
+                            }
+                          >
+                            <td>{e.recordId}</td>
+                            <td>{e.source}</td>
+                            <td>{e.exceptionType ?? "—"}</td>
+                            <td onClick={(ev) => ev.stopPropagation()}>
+                              {queued ? (
+                                <span className="pending-tag">
+                                  Pending re-run ({queued.decision})
+                                </span>
+                              ) : (
+                                <>
+                                  <motion.button
+                                    className="btn accept"
+                                    onClick={() =>
+                                      void sendCorrection(e, "accept")
+                                    }
+                                    whileTap={{ scale: 0.95 }}
+                                  >
+                                    Accept
+                                  </motion.button>
+                                  <motion.button
+                                    className="btn reject"
+                                    onClick={() =>
+                                      void sendCorrection(e, "reject")
+                                    }
+                                    whileTap={{ scale: 0.95 }}
+                                  >
+                                    Reject
+                                  </motion.button>
+                                </>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </motion.div>
+              </AnimatePresence>
             </div>
             <Pagination
               id="exceptions"
@@ -759,11 +792,12 @@ export default function App() {
                 <span className="pane-meta">{report.matches.length} total</span>
               </div>
               <div className="match-list-wrap">
-                <AnimatePresence mode="wait">
+                <AnimatePresence mode="wait" initial={false} custom={matchDirection}>
                   <motion.ul
                     key={matchPage}
                     className="match-list"
-                    variants={pageFade}
+                    custom={matchDirection}
+                    variants={pageSlide}
                     initial="enter"
                     animate="center"
                     exit="exit"
@@ -907,8 +941,6 @@ function ExceptionDrawer({
   onReject: (row: Exception) => void;
 }) {
   const mobile = useIsMobile();
-  const hidden = mobile ? { y: "100%" } : { x: "100%" };
-  const visible = mobile ? { y: 0 } : { x: 0 };
 
   useEffect(() => {
     if (!exception) return;
@@ -916,84 +948,93 @@ function ExceptionDrawer({
       if (e.key === "Escape") onClose();
     }
     document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      document.body.style.overflow = prev;
+    };
   }, [exception, onClose]);
 
-  return (
+  return createPortal(
     <AnimatePresence>
       {exception && (
-        <>
-          <motion.button
-            type="button"
-            className="drawer-backdrop"
-            aria-label="Close details"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.15 }}
-            onClick={onClose}
-          />
-          <motion.aside
-            className="exception-drawer"
-            role="dialog"
-            aria-label={`Details for ${exception.recordId}`}
-            initial={hidden}
-            animate={visible}
-            exit={hidden}
-            transition={{ type: "spring", stiffness: 420, damping: 38 }}
-          >
-            <div className="drawer-header">
-              <div>
-                <span className="drawer-label">Exception</span>
-                <h3 className="drawer-title">{exception.recordId}</h3>
-              </div>
-              <button
-                type="button"
-                className="drawer-close"
-                aria-label="Close"
-                onClick={onClose}
-              >
-                ×
-              </button>
-            </div>
-            <dl className="drawer-meta">
-              <dt>Source</dt>
-              <dd>{exception.source}</dd>
-              <dt>Type</dt>
-              <dd>{exception.exceptionType ?? "—"}</dd>
-            </dl>
-            <div className="drawer-reason">
-              <span className="drawer-label">Reason</span>
-              <p>{exception.reason}</p>
-            </div>
-            <div className="drawer-actions">
-              {pending ? (
-                <span className="pending-tag">
-                  Pending re-run ({pending.decision})
-                </span>
-              ) : (
-                <>
-                  <button
-                    type="button"
-                    className="btn accept"
-                    onClick={() => onAccept(exception)}
-                  >
-                    Accept
-                  </button>
-                  <button
-                    type="button"
-                    className="btn reject"
-                    onClick={() => onReject(exception)}
-                  >
-                    Reject
-                  </button>
-                </>
-              )}
-            </div>
-          </motion.aside>
-        </>
+        <motion.button
+          key="drawer-backdrop"
+          type="button"
+          className="drawer-backdrop"
+          aria-label="Close details"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.2, ease: [0.32, 0.72, 0, 1] }}
+          onClick={onClose}
+        />
       )}
-    </AnimatePresence>
+      {exception && (
+        <motion.aside
+          key="exception-drawer"
+          className="exception-drawer"
+          role="dialog"
+          aria-modal="true"
+          aria-label={`Details for ${exception.recordId}`}
+          initial={mobile ? { y: "100%" } : { x: "100%" }}
+          animate={mobile ? { y: 0 } : { x: 0 }}
+          exit={mobile ? { y: "100%" } : { x: "100%" }}
+          transition={{ duration: 0.32, ease: [0.32, 0.72, 0, 1] }}
+        >
+          <div className="drawer-header">
+            <div>
+              <span className="drawer-label">Exception</span>
+              <h3 className="drawer-title">{exception.recordId}</h3>
+            </div>
+            <button
+              type="button"
+              className="drawer-close"
+              aria-label="Close"
+              onClick={onClose}
+            >
+              ×
+            </button>
+          </div>
+          <dl className="drawer-meta">
+            <dt>Source</dt>
+            <dd>{exception.source}</dd>
+            <dt>Type</dt>
+            <dd>{exception.exceptionType ?? "—"}</dd>
+          </dl>
+          <div className="drawer-reason">
+            <span className="drawer-label">Reason</span>
+            <p>{exception.reason}</p>
+          </div>
+          <div className="drawer-actions">
+            {pending ? (
+              <span className="pending-tag">
+                Pending re-run ({pending.decision})
+              </span>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  className="btn accept"
+                  onClick={() => onAccept(exception)}
+                >
+                  Accept
+                </button>
+                <button
+                  type="button"
+                  className="btn reject"
+                  onClick={() => onReject(exception)}
+                >
+                  Reject
+                </button>
+              </>
+            )}
+          </div>
+        </motion.aside>
+      )}
+    </AnimatePresence>,
+    document.body,
   );
 }
 
