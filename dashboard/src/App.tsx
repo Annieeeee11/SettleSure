@@ -3,7 +3,6 @@ import {
   useEffect,
   useMemo,
   useState,
-  Fragment,
   type ReactNode,
 } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -875,6 +874,126 @@ function Metric({
       <span className="metric-value">{value}</span>
       <span className="metric-label">{label}</span>
     </div>
+  );
+}
+
+function useIsMobile(breakpoint = 800) {
+  const query = `(max-width: ${breakpoint}px)`;
+  const [mobile, setMobile] = useState(() =>
+    typeof window !== "undefined"
+      ? window.matchMedia(query).matches
+      : false,
+  );
+  useEffect(() => {
+    const mq = window.matchMedia(query);
+    const update = () => setMobile(mq.matches);
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, [query]);
+  return mobile;
+}
+
+function ExceptionDrawer({
+  exception,
+  pending,
+  onClose,
+  onAccept,
+  onReject,
+}: {
+  exception: Exception | null;
+  pending?: PendingCorrection;
+  onClose: () => void;
+  onAccept: (row: Exception) => void;
+  onReject: (row: Exception) => void;
+}) {
+  const mobile = useIsMobile();
+  const hidden = mobile ? { y: "100%" } : { x: "100%" };
+  const visible = mobile ? { y: 0 } : { x: 0 };
+
+  useEffect(() => {
+    if (!exception) return;
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [exception, onClose]);
+
+  return (
+    <AnimatePresence>
+      {exception && (
+        <>
+          <motion.button
+            type="button"
+            className="drawer-backdrop"
+            aria-label="Close details"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.15 }}
+            onClick={onClose}
+          />
+          <motion.aside
+            className="exception-drawer"
+            role="dialog"
+            aria-label={`Details for ${exception.recordId}`}
+            initial={hidden}
+            animate={visible}
+            exit={hidden}
+            transition={{ type: "spring", stiffness: 420, damping: 38 }}
+          >
+            <div className="drawer-header">
+              <div>
+                <span className="drawer-label">Exception</span>
+                <h3 className="drawer-title">{exception.recordId}</h3>
+              </div>
+              <button
+                type="button"
+                className="drawer-close"
+                aria-label="Close"
+                onClick={onClose}
+              >
+                ×
+              </button>
+            </div>
+            <dl className="drawer-meta">
+              <dt>Source</dt>
+              <dd>{exception.source}</dd>
+              <dt>Type</dt>
+              <dd>{exception.exceptionType ?? "—"}</dd>
+            </dl>
+            <div className="drawer-reason">
+              <span className="drawer-label">Reason</span>
+              <p>{exception.reason}</p>
+            </div>
+            <div className="drawer-actions">
+              {pending ? (
+                <span className="pending-tag">
+                  Pending re-run ({pending.decision})
+                </span>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    className="btn accept"
+                    onClick={() => onAccept(exception)}
+                  >
+                    Accept
+                  </button>
+                  <button
+                    type="button"
+                    className="btn reject"
+                    onClick={() => onReject(exception)}
+                  >
+                    Reject
+                  </button>
+                </>
+              )}
+            </div>
+          </motion.aside>
+        </>
+      )}
+    </AnimatePresence>
   );
 }
 

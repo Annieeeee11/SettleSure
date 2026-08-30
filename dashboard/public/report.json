@@ -13,13 +13,13 @@
     "trueExceptionCount": 35,
     "predictedExceptionCount": 43,
     "correctlyFlaggedExceptions": 29,
-    "throughputRecordsPerSec": 12526.29,
+    "throughputRecordsPerSec": 12399.31,
     "timing": {
-      "exactMs": 0.971,
-      "fuzzyMs": 7.854,
-      "splitMs": 0.218,
-      "llmMs": 0.223,
-      "totalMs": 10.937
+      "exactMs": 0.973,
+      "fuzzyMs": 7.871,
+      "splitMs": 0.217,
+      "llmMs": 0.238,
+      "totalMs": 11.049
     },
     "matchSourceBreakdown": {
       "exact": 23,
