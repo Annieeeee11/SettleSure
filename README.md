@@ -1,6 +1,7 @@
 <p align="center">
   <img src="/docs/image.png"" alt="logo" />
 </p>
+
 # SettleSure: Payment Gateway Settlement Reconciliation
 
 **Razorpay AI Buildathon — [Track 04: AI Finance Controller](https://razorpay.com/buildathon/)**
