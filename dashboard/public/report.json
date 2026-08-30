@@ -1,32 +1,32 @@
 {
   "metrics": {
     "matchRate": 0.8571428571428571,
-    "precision": 1.0,
+    "precision": 0.9545454545454546,
     "recall": 0.8571428571428571,
-    "falsePositiveRate": 0.0,
-    "exceptionAccuracy": 0.7142857142857143,
+    "falsePositiveRate": 0.045454545454545456,
+    "exceptionAccuracy": 0.6744186046511628,
     "trueMatchCount": 49,
-    "predictedMatchCount": 42,
+    "predictedMatchCount": 44,
     "truePositive": 42,
-    "falsePositive": 0,
+    "falsePositive": 2,
     "falseNegative": 7,
     "trueExceptionCount": 35,
-    "predictedExceptionCount": 49,
-    "correctlyFlaggedExceptions": 35,
-    "throughputRecordsPerSec": 94678.65,
+    "predictedExceptionCount": 43,
+    "correctlyFlaggedExceptions": 29,
+    "throughputRecordsPerSec": 12526.29,
     "timing": {
-      "exactMs": 0.097,
-      "fuzzyMs": 0.699,
-      "splitMs": 0.085,
-      "llmMs": 0.125,
-      "totalMs": 1.447
+      "exactMs": 0.971,
+      "fuzzyMs": 7.854,
+      "splitMs": 0.218,
+      "llmMs": 0.223,
+      "totalMs": 10.937
     },
     "matchSourceBreakdown": {
       "exact": 23,
       "fuzzy": 17,
       "split": 2,
       "llm": 0,
-      "human": 0
+      "human": 2
     },
     "bankCount": 60,
     "settlementCount": 77,
@@ -57,13 +57,13 @@
       },
       "decoy": {
         "matchRate": 0.5,
-        "precision": 1.0,
+        "precision": 0.6,
         "recall": 0.5,
         "trueMatchCount": 6,
-        "predictedMatchCount": 3,
+        "predictedMatchCount": 5,
         "truePositive": 3,
-        "falsePositive": 0,
-        "correctlyDeferred": 22,
+        "falsePositive": 2,
+        "correctlyDeferred": 16,
         "deferredTotal": 22,
         "notes": "correctly deferred, not auto-resolved to decoy"
       },
@@ -82,6 +82,28 @@
     }
   },
   "matches": [
+    {
+      "bankCreditId": "bank_0048",
+      "settlementId": "setl_0060",
+      "components": [
+        "setl_0060",
+        "setl_0061"
+      ],
+      "confidence": 1.0,
+      "matchedBy": "human",
+      "reasoning": "Accepted by human correction"
+    },
+    {
+      "bankCreditId": "bank_0049",
+      "settlementId": "setl_0064",
+      "components": [
+        "setl_0064",
+        "setl_0065"
+      ],
+      "confidence": 1.0,
+      "matchedBy": "human",
+      "reasoning": "Accepted by human correction"
+    },
     {
       "bankCreditId": "bank_0001",
       "settlementId": "setl_0001",
@@ -571,41 +593,10 @@
       ]
     },
     {
-      "recordId": "bank_0048",
-      "source": "bank",
-      "reason": "ambiguous split — LLM unavailable: ambiguous split — multiple settlement combinations sum to credit: setl_0060+setl_0061 | setl_0062+setl_0063",
-      "exceptionType": "batched_payout",
-      "relatedIds": [
-        "setl_0060",
-        "setl_0061",
-        "setl_0062",
-        "setl_0063"
-      ]
-    },
-    {
-      "recordId": "bank_0049",
-      "source": "bank",
-      "reason": "ambiguous split — LLM unavailable: ambiguous split — multiple settlement combinations sum to credit: setl_0064+setl_0065 | setl_0066+setl_0067",
-      "exceptionType": "batched_payout",
-      "relatedIds": [
-        "setl_0064",
-        "setl_0065",
-        "setl_0066",
-        "setl_0067"
-      ]
-    },
-    {
       "recordId": "bank_0050",
       "source": "bank",
-      "reason": "ambiguous split — LLM unavailable: ambiguous split — multiple settlement combinations sum to credit: setl_0039+setl_0060+setl_0061+setl_0062 | setl_0039+setl_0060+setl_0061+setl_0063 | setl_0039+setl_0060+setl_0062+setl_0063",
-      "exceptionType": "batched_payout",
-      "relatedIds": [
-        "setl_0039",
-        "setl_0060",
-        "setl_0061",
-        "setl_0062",
-        "setl_0063"
-      ]
+      "reason": "no plausible counterpart in window",
+      "exceptionType": "unresolvable_noise"
     },
     {
       "recordId": "bank_0051",
@@ -680,18 +671,6 @@
       "exceptionType": "settlement_pending_bank"
     },
     {
-      "recordId": "setl_0060",
-      "source": "settlement",
-      "reason": "settlement present, bank credit missing (payout may be in transit)",
-      "exceptionType": "settlement_pending_bank"
-    },
-    {
-      "recordId": "setl_0061",
-      "source": "settlement",
-      "reason": "settlement present, bank credit missing (payout may be in transit)",
-      "exceptionType": "settlement_pending_bank"
-    },
-    {
       "recordId": "setl_0062",
       "source": "settlement",
       "reason": "settlement present, bank credit missing (payout may be in transit)",
@@ -699,18 +678,6 @@
     },
     {
       "recordId": "setl_0063",
-      "source": "settlement",
-      "reason": "settlement present, bank credit missing (payout may be in transit)",
-      "exceptionType": "settlement_pending_bank"
-    },
-    {
-      "recordId": "setl_0064",
-      "source": "settlement",
-      "reason": "settlement present, bank credit missing (payout may be in transit)",
-      "exceptionType": "settlement_pending_bank"
-    },
-    {
-      "recordId": "setl_0065",
       "source": "settlement",
       "reason": "settlement present, bank credit missing (payout may be in transit)",
       "exceptionType": "settlement_pending_bank"
