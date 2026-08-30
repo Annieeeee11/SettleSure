@@ -1,22 +1,22 @@
 <p align="center">
-  <img src="/docs/image.png"" alt="logo" />
+  <img src="docs/image.png" alt="logo" />
 </p>
 
 # SettleSure: Payment Gateway Settlement Reconciliation
 
-**Razorpay AI Buildathon — [Track 04: AI Finance Controller](https://razorpay.com/buildathon/)**
+**Razorpay AI Buildathon, [Track 04: AI Finance Controller](https://razorpay.com/buildathon/)**
 
 ![Razorpay](https://img.shields.io/badge/Razorpay-072654?style=flat&logo=razorpay&logoColor=white)
 ![Rust](https://img.shields.io/badge/rust-1.90+-orange?style=flat&logo=rust)
 ![CI](https://github.com/Annieeeee11/SettleSure/actions/workflows/ci.yml/badge.svg)
 
-Rules handle **42/49** true matches in **~13 ms**; LLM verifies the **7** genuinely ambiguous cases rules cannot safely decide.
+Rules handle **42/49** true matches in **~13 ms**. LLM verifies the **7** genuinely ambiguous cases rules cannot safely decide.
 
 | Precision | Recall | FP rate | Exact / Fuzzy / Split / LLM / Human |
 | ---: | ---: | ---: | ---: |
 | **100%** | **85.71%** | **0%** | 23 / 17 / 2 / 0 / 0 |
 
-Seed 42 · 77 payments / 77 settlements / 60 bank credits · `--skip-llm` baseline (no corrections)
+Seed 42, 77 payments / 77 settlements / 60 bank credits, `--skip-llm` baseline (no corrections).
 
 | CLI | Dashboard |
 | --- | --- |
@@ -29,27 +29,17 @@ npm run sync-report    # regenerate baseline + copy to dashboard/public/report.j
 npm run dashboard      # http://localhost:5173
 ```
 
-1. `cargo run -p settlesure-cli -- --seed 42 --skip-llm` — exact → fuzzy → split, writes `output/report.json`
-2. Dashboard shows match rate, precision, recall, FP rate by case difficulty, and the full exception list
-3. **Human loop (separate demo):** Accept an exception → Re-run with corrections — do **not** use this run for headline metrics (FP by design on GT-exception rows)
-
-## Track 04 bar checklist
-
-| Razorpay bar | SettleSure evidence |
-| --- | --- |
-| 50+ synthetic records | seed 42 = 77 records; `--batch-scale 50` = 3,850+ |
-| Match rate | 85.71% recall deterministic; 100% with capable LLM |
-| Honest exception list | `output/report.md` + dashboard Exceptions tab |
-| Throughput + accuracy | timing breakdown, difficulty slices, CI baseline gate |
-| No cherry-picking | `forbidSuspiciousPerfect` in CI blocks fake 100%/100%/0% |
+1. `cargo run -p settlesure-cli -- --seed 42 --skip-llm` runs exact, fuzzy, and split passes and writes `output/report.json`.
+2. Dashboard shows match rate, precision, recall, FP rate by case difficulty, and the full exception list.
+3. **Human loop (separate demo):** Accept an exception, then Re-run with corrections. Do **not** use this run for headline metrics. FP by design on GT-exception rows.
 
 ## Engineering judgment
 
 We caught and fixed three results that looked good but weren't:
 
-1. **Suspicious perfect score** — 100%/100%/0% with zero LLM/human meant the adversarial batch no longer exercised fallback tiers. Generator hardened so `--skip-llm` leaves 7 ambiguous GT matches unresolved.
-2. **Transport errors mislabeled** — connection failures showed as `"ambiguous — LLM error"`. Split into explicit `provider error` vs `declined (unsure)`.
-3. **Docker stub binary** — container shipped wrong binary. Fixed in Dockerfile.
+1. **Suspicious perfect score.** 100%/100%/0% with zero LLM/human meant the adversarial batch no longer exercised fallback tiers. Generator hardened so `--skip-llm` leaves 7 ambiguous GT matches unresolved.
+2. **Transport errors mislabeled.** Connection failures showed as `"ambiguous — LLM error"`. Split into explicit `provider error` vs `declined (unsure)`.
+3. **Docker stub binary.** Container shipped wrong binary. Fixed in Dockerfile.
 
 ## AI design: verifier, not matcher
 
@@ -65,16 +55,16 @@ LLM is **tier 4**, not tier 1. Clear cases never touch the model.
 
 | Model | Recall w/ LLM | LLM matches | Verdicts (match / no_match / declined) |
 | --- | ---: | ---: | --- |
-| none (`--skip-llm`) | 85.71% | 0 | — |
+| none (`--skip-llm`) | 85.71% | 0 | n/a |
 | **qwen2.5-coder:7b** (Ollama) | **100.00%** | **7** | 7 / 0 / 2 |
 | llama3.2 (Ollama, measured 2026-08-30) | 89.80% | 2 | 2 / 3 / 5 |
-| gpt-4o-mini (OpenAI BYOK) | re-measure with key | — | — |
+| gpt-4o-mini (OpenAI BYOK) | re-measure with key | n/a | n/a |
 | qwen2.5:7b | 85.71% | 0 | 0 / 7 / 2 |
 
-qwen2.5-coder measured 2026-08-27; llama3.2 re-measured 2026-08-30 on hardened generator. Model choice matters — weak models show zero recall lift.
+qwen2.5-coder measured 2026-08-27. llama3.2 re-measured 2026-08-30 on hardened generator. Model choice matters. Weak models show zero recall lift.
 
 ```bash
-# Primary local demo (Ollama — best recall lift)
+# Primary local demo (Ollama, best recall lift)
 cargo run -p settlesure-cli -- --seed 42 --compare-llm \
   --llm-provider ollama --llm-model qwen2.5-coder:7b --no-llm-cache --no-banner
 
@@ -104,7 +94,7 @@ When `--compare-llm` runs with a reachable provider, the report includes `llmAbl
 | `LLM unavailable — provider error` | Transport/HTTP failure after one retry |
 | `ambiguous — LLM unavailable` | Provider not selected / Ollama unreachable |
 
-Copy ablation output for dashboard LLM panel: `cp output/report.json dashboard/public/report-llm.json` (committed sample uses llama3.2)
+Copy ablation output for dashboard LLM panel: `cp output/report.json dashboard/public/report-llm.json` (committed sample uses llama3.2).
 
 ## Architecture
 
@@ -163,7 +153,7 @@ npm run dashboard     # http://localhost:5173
 | `--generate-only` | Write data files and exit |
 | `--skip-llm` | Force no LLM |
 | `--llm-provider <…>` | `anthropic` \| `openai` \| `ollama` \| `none` |
-| `--llm-model <name>` | Model name (Ollama default `llama3.2`; OpenAI default `gpt-4o-mini`) |
+| `--llm-model <name>` | Model name (Ollama default `llama3.2`, OpenAI default `gpt-4o-mini`) |
 | `--llm-base-url <url>` | OpenAI-compatible API root |
 | `--apply-corrections` | Apply `output/corrections.json` or `data/demo_corrections.json` |
 | `--runs <n>` | Multi-seed robustness (seeds `seed..seed+n-1`) |
@@ -193,7 +183,7 @@ Measured 2026-08-30 with `cargo run --release -p settlesure-cli -- --seed 42 --b
 | 10× | 770 / 770 / 600 | 218.5 | 6,269 |
 | 50× | 3,850 / 3,850 / 3,000 | 3,820.6 | 1,793 |
 
-Fuzzy pass dominates at scale; amount × date bucketing reduces pairwise comparisons.
+Fuzzy pass dominates at scale. Amount × date bucketing reduces pairwise comparisons.
 
 ## Docker
 
@@ -204,21 +194,13 @@ docker compose up engine      # writes output/report.json
 docker compose up dashboard   # http://localhost:5173
 ```
 
-**Container notes:** Ollama runs on the host, not inside the container. Dashboard `/api/rerun` requires a local Rust toolchain (dev convenience).
-
-## Cargo workspace
-
-```
-crates/settlesure-types | data | engine | scoring | llm | cli
-```
-
-Engine has no network code; LLM is isolated and async.
+**Container notes.** Ollama runs on the host, not inside the container. Dashboard `/api/rerun` requires a local Rust toolchain (dev convenience).
 
 ## Metrics (never blended)
 
 Overall precision, recall, and FP rate are reported separately, plus **Accuracy by case difficulty** in `output/report.md` and the dashboard.
 
-**Exception accuracy** = correctly flagged exceptions ÷ predicted exception count. Under `--skip-llm`, the 7 deliberately-unresolved ambiguous GT matches produce `ambiguous — LLM unavailable` rows that inflate the denominator — **~71%** at seed 42. With LLM enabled those cases resolve to matches. Expected, not a regression.
+**Exception accuracy** = correctly flagged exceptions ÷ predicted exception count. Under `--skip-llm`, the 7 deliberately-unresolved ambiguous GT matches produce `ambiguous — LLM unavailable` rows that inflate the denominator. **~71%** at seed 42. With LLM enabled those cases resolve to matches. Expected, not a regression.
 
 ## Tests & CI
 
@@ -230,16 +212,6 @@ npm run sync-report
 
 CI fails if seed 42 is suspiciously perfect (100%/100%/0% with zero LLM/human tier usage) or if adversarial GT slices disappear.
 
-## Submission checklist
-
-For [Razorpay AI Buildathon](https://razorpay.com/buildathon/) submission:
-
-- [ ] Public repo: `Annieeeee11/SettleSure`
-- [ ] Track: **04 — AI Finance Controller**
-- [ ] 5-minute pitch video: problem → pipeline → metrics → one failure handled → architecture
-- [ ] Architecture: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) + README diagram
-- [ ] Working demo: `npm run sync-report && npm run dashboard`
-- [ ] LLM demo: `--compare-llm` with qwen2.5-coder or gpt-4o-mini
 
 ## History
 
@@ -257,4 +229,4 @@ For [Razorpay AI Buildathon](https://razorpay.com/buildathon/) submission:
 - No FX conversion
 - Ollama residual nondeterminism possible (model/hardware)
 - `--skip-llm` intentionally under-matches ambiguous GT rows
-- LLM ablation numbers are model-dependent — re-measure per provider
+- LLM ablation numbers are model-dependent. Re-measure per provider.
