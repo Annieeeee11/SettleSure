@@ -230,3 +230,11 @@ CI fails if seed 42 is suspiciously perfect (100%/100%/0% with zero LLM/human ti
 - Ollama residual nondeterminism possible (model/hardware)
 - `--skip-llm` intentionally under-matches ambiguous GT rows
 - LLM ablation numbers are model-dependent. Re-measure per provider.
+
+## Security
+
+- **Deterministic core:** `settlesure-engine` has no dependency on `settlesure-llm` and no code path that invokes it. Exact, fuzzy, and split matching cannot be influenced by adversarial strings in bank UTRs or settlement references — those fields are never sent to a model.
+- **LLM tier input:** All match-relevant data in LLM prompts (UTRs, IDs, reasoning strings, split options) is wrapped in `<untrusted_data>...</untrusted_data>` tags, with an explicit system-level instruction to treat tagged content as data only, never as instructions.
+- **LLM tier output:** Model responses are parsed against a fixed verdict vocabulary (`match`, `no_match`, `unsure`). Any other value, malformed JSON, or non-JSON response falls back to `unsure` (declined/exception), not a trusted match.
+- **Tests:** `crates/settlesure-llm/tests/prompt_injection.rs` covers untrusted-field delimiting, adversarial UTR injection with mocked provider responses, and malformed output rejection.
+- **Not covered:** A fully compromised model that returns valid `{"verdict":"match",...}` JSON is accepted by the parser — mitigating that would require cross-checks beyond current scope.

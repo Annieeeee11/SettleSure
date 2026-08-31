@@ -18,3 +18,5 @@ async-trait = "0.1.88"
 [dev-dependencies]
 wiremock = "0.6"
 tracing-subscriber = { workspace = true }
+tokio = { workspace = true }
+async-trait = "0.1.88"

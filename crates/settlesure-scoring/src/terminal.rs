@@ -1,6 +1,7 @@
 //! Terminal report formatting — port of `src/scoring/terminalReport.ts`.
 
 use crate::ansi::{bold, box_frame, cyan, dim, green, red, visible_width, yellow};
+use crate::invariant::ReconciliationInvariant;
 use crate::metrics::pct;
 use crate::report::group_exceptions_for_display;
 use settlesure_types::{AmbiguityLevel, FullReport};
@@ -58,7 +59,11 @@ pub struct ReportPaths<'a> {
     pub md_path: Option<&'a str>,
 }
 
-pub fn format_terminal(report: &FullReport, paths: Option<ReportPaths<'_>>) -> String {
+pub fn format_terminal(
+    report: &FullReport,
+    paths: Option<ReportPaths<'_>>,
+    invariant: Option<&ReconciliationInvariant>,
+) -> String {
     let m = &report.metrics;
     let mut out: Vec<String> = Vec::new();
 
@@ -77,6 +82,13 @@ pub fn format_terminal(report: &FullReport, paths: Option<ReportPaths<'_>>) -> S
         m.settlement_count,
         m.bank_count,
     ));
+    if let Some(inv) = invariant {
+        out.push(format!(
+            "{}{}",
+            dim("  "),
+            green(&inv.format_terminal_line())
+        ));
+    }
     out.push(String::new());
 
     let metrics_body = vec![

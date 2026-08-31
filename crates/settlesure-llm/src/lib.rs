@@ -14,8 +14,10 @@ pub use ollama::{is_ollama_reachable, OllamaProvider};
 pub use openai_compat::OpenAiCompatProvider;
 pub use provider::{
     build_resolve_payload, parse_verdict_json, resolve_with_retry, resolve_with_retry_timed,
-    LlmCallResult, LlmError, LlmProvider, LlmVerdict, VerdictKind, SETTLEMENT_SYSTEM_PROMPT,
+    wrap_untrusted, LlmCallResult, LlmError, LlmProvider, LlmVerdict, VerdictKind,
+    SETTLEMENT_SYSTEM_PROMPT,
 };
 pub use resolve::{
-    llm_resolve, select_llm_provider, LlmResolveResult, LlmSelectOptions, SelectedLlm,
+    llm_resolve, llm_resolve_with_provider, select_llm_provider, LlmResolveOptions,
+    LlmResolveResult, LlmSelectOptions, SelectedLlm,
 };

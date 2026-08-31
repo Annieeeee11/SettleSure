@@ -52,6 +52,25 @@ pub struct LlmSelectOptions {
     pub llm_cache_path: Option<PathBuf>,
 }
 
+/// Options for [`llm_resolve_with_provider`] (cache + model identity).
+pub struct LlmResolveOptions {
+    pub seed: u32,
+    pub llm_model: Option<String>,
+    pub llm_cache: bool,
+    pub llm_cache_path: Option<PathBuf>,
+}
+
+impl LlmResolveOptions {
+    pub fn from_select(options: &LlmSelectOptions) -> Self {
+        Self {
+            seed: options.seed,
+            llm_model: options.llm_model.clone(),
+            llm_cache: options.llm_cache,
+            llm_cache_path: options.llm_cache_path.clone(),
+        }
+    }
+}
+
 pub struct SelectedLlm {
     pub provider: Option<Box<dyn LlmProvider>>,
     pub name: String,
@@ -370,18 +389,191 @@ fn push_declined_exceptions(
     }
 }
 
+fn llm_unavailable_exceptions(ambiguous: &[AmbiguousCandidate]) -> Vec<Exception> {
+    let mut exceptions = Vec::new();
+    for a in ambiguous {
+        if a.kind == Some(AmbiguousKind::Split) {
+            if let Some(split_options) = a.split_options.as_ref() {
+                let all_ids = unique_flat(split_options);
+                exceptions.push(Exception {
+                    record_id: a.bank.id.clone(),
+                    source: ExceptionSource::Bank,
+                    reason: format!("ambiguous split — LLM unavailable: {}", a.reasoning),
+                    exception_type: Some(DiscrepancyClass::BatchedPayout),
+                    related_ids: Some(all_ids),
+                });
+                continue;
+            }
+        }
+        let related_extra = rival_ids(a);
+        push_pair_exceptions(
+            &mut exceptions,
+            &a.bank.id,
+            &a.settlement.settlement_id,
+            "ambiguous — LLM unavailable",
+            &related_extra,
+        );
+    }
+    exceptions
+}
+
+fn apply_verdict(
+    matches: &mut Vec<MatchResult>,
+    exceptions: &mut Vec<Exception>,
+    a: &AmbiguousCandidate,
+    verdict: &crate::provider::LlmVerdict,
+    split_options: Option<&[Vec<String>]>,
+) {
+    match verdict.verdict {
+        VerdictKind::Match => {
+            if let Some(split_options) = split_options {
+                match verdict
+                    .chosen_settlement_ids
+                    .as_ref()
+                    .filter(|c| is_valid_split_choice(Some(c.as_slice()), split_options))
+                {
+                    Some(components) => {
+                        let mut components = components.clone();
+                        components.sort();
+                        let settlement_id = components[0].clone();
+                        matches.push(MatchResult {
+                            bank_credit_id: a.bank.id.clone(),
+                            settlement_id,
+                            components: Some(components),
+                            confidence: a.score.max(0.8),
+                            matched_by: MatchSource::Llm,
+                            reasoning: Some(format!(
+                                "LLM verdict: match (split) — {}",
+                                verdict.reasoning
+                            )),
+                        });
+                    }
+                    None => {
+                        exceptions.push(Exception {
+                            record_id: a.bank.id.clone(),
+                            source: ExceptionSource::Bank,
+                            reason: format!(
+                                "LLM verdict: match but invalid/missing chosenSettlementIds — {}",
+                                verdict.reasoning
+                            ),
+                            exception_type: Some(DiscrepancyClass::BatchedPayout),
+                            related_ids: Some(unique_flat(split_options)),
+                        });
+                    }
+                }
+            } else {
+                matches.push(MatchResult {
+                    bank_credit_id: a.bank.id.clone(),
+                    settlement_id: a.settlement.settlement_id.clone(),
+                    components: None,
+                    confidence: a.score.max(0.8),
+                    matched_by: MatchSource::Llm,
+                    reasoning: Some(format!("LLM verdict: match — {}", verdict.reasoning)),
+                });
+            }
+        }
+        VerdictKind::NoMatch => {
+            if let Some(split_options) = split_options {
+                exceptions.push(Exception {
+                    record_id: a.bank.id.clone(),
+                    source: ExceptionSource::Bank,
+                    reason: format!("LLM verdict: no_match (split) — {}", verdict.reasoning),
+                    exception_type: Some(DiscrepancyClass::BatchedPayout),
+                    related_ids: Some(unique_flat(split_options)),
+                });
+            } else {
+                push_pair_exceptions(
+                    exceptions,
+                    &a.bank.id,
+                    &a.settlement.settlement_id,
+                    &format!("LLM verdict: no_match — {}", verdict.reasoning),
+                    &rival_ids(a),
+                );
+            }
+        }
+        VerdictKind::Unsure => {
+            push_declined_exceptions(exceptions, a, &verdict.reasoning, split_options);
+        }
+    }
+}
+
+/// Resolve ambiguous cases with an injected provider (used in tests and production).
+pub async fn llm_resolve_with_provider(
+    ambiguous: &[AmbiguousCandidate],
+    provider: &dyn LlmProvider,
+    provider_name: &str,
+    options: &LlmResolveOptions,
+) -> LlmResolveResult {
+    let mut matches = Vec::new();
+    let mut exceptions = Vec::new();
+    let mut stats = CallStatsAccumulator::new();
+    let model_name = options.llm_model.as_deref().unwrap_or("llama3.2");
+    let mut cache = if options.llm_cache {
+        Some(VerdictCache::load(
+            options
+                .llm_cache_path
+                .clone()
+                .unwrap_or_else(|| PathBuf::from("output/llm-cache.json")),
+        ))
+    } else {
+        None
+    };
+
+    for a in ambiguous {
+        let split_options: Option<&[Vec<String>]> = if a.kind == Some(AmbiguousKind::Split) {
+            a.split_options.as_deref().filter(|o| !o.is_empty())
+        } else {
+            None
+        };
+
+        let label = candidate_label(a);
+        let (call_result, latency_ms) = if let Some(ref cache_ref) = cache {
+            if let Some(cached) = cache_ref.get(a, model_name, options.seed) {
+                (LlmCallResult::Verdict(cached), 0.0)
+            } else {
+                let (result, lat) = resolve_with_retry_timed(provider, a).await;
+                if let Some(ref mut c) = cache {
+                    c.insert_from_result(a, model_name, options.seed, &result);
+                }
+                (result, lat)
+            }
+        } else {
+            resolve_with_retry_timed(provider, a).await
+        };
+        stats.record(&call_result, latency_ms, &label);
+
+        match call_result {
+            LlmCallResult::Verdict(verdict) => {
+                apply_verdict(&mut matches, &mut exceptions, a, &verdict, split_options);
+            }
+            LlmCallResult::ProviderError { message, .. } => {
+                push_provider_error_exceptions(&mut exceptions, a, &message, split_options);
+            }
+        }
+    }
+
+    if let Some(ref mut cache) = cache {
+        let _ = cache.save_if_dirty();
+    }
+
+    LlmResolveResult {
+        matches,
+        exceptions,
+        enabled: true,
+        provider_name: provider_name.to_string(),
+        call_stats: Some(stats.finish()),
+    }
+}
+
 /// Resolve only the ambiguous bucket via the selected LLM provider.
 pub async fn llm_resolve(
     ambiguous: &[AmbiguousCandidate],
     options: &LlmSelectOptions,
 ) -> LlmResolveResult {
-    let mut matches = Vec::new();
-    let mut exceptions = Vec::new();
-
     if ambiguous.is_empty() {
         return LlmResolveResult {
-            matches,
-            exceptions,
+            matches: Vec::new(),
+            exceptions: Vec::new(),
             enabled: false,
             provider_name: "none".into(),
             call_stats: None,
@@ -398,166 +590,20 @@ pub async fn llm_resolve(
     );
 
     let Some(provider) = provider else {
-        for a in ambiguous {
-            if a.kind == Some(AmbiguousKind::Split) {
-                if let Some(split_options) = a.split_options.as_ref() {
-                    let all_ids = unique_flat(split_options);
-                    exceptions.push(Exception {
-                        record_id: a.bank.id.clone(),
-                        source: ExceptionSource::Bank,
-                        reason: format!("ambiguous split — LLM unavailable: {}", a.reasoning),
-                        exception_type: Some(DiscrepancyClass::BatchedPayout),
-                        related_ids: Some(all_ids),
-                    });
-                    continue;
-                }
-            }
-            let related_extra = rival_ids(a);
-            push_pair_exceptions(
-                &mut exceptions,
-                &a.bank.id,
-                &a.settlement.settlement_id,
-                "ambiguous — LLM unavailable",
-                &related_extra,
-            );
-        }
         return LlmResolveResult {
-            matches,
-            exceptions,
+            matches: Vec::new(),
+            exceptions: llm_unavailable_exceptions(ambiguous),
             enabled: false,
             provider_name: "none".into(),
             call_stats: None,
         };
     };
 
-    let mut stats = CallStatsAccumulator::new();
-    let model_name = options.llm_model.as_deref().unwrap_or("llama3.2");
-    let mut cache = if options.llm_cache {
-        Some(VerdictCache::load(
-            options
-                .llm_cache_path
-                .clone()
-                .unwrap_or_else(|| PathBuf::from("output/llm-cache.json")),
-        ))
-    } else {
-        None
-    };
-
-    // Ollama serves one request at a time on typical local installs — keep sequential.
-    for a in ambiguous {
-        let split_options: Option<&[Vec<String>]> = if a.kind == Some(AmbiguousKind::Split) {
-            a.split_options.as_deref().filter(|o| !o.is_empty())
-        } else {
-            None
-        };
-
-        let label = candidate_label(a);
-        let (call_result, latency_ms) = if let Some(ref cache_ref) = cache {
-            if let Some(cached) = cache_ref.get(a, model_name, options.seed) {
-                (LlmCallResult::Verdict(cached), 0.0)
-            } else {
-                let (result, lat) = resolve_with_retry_timed(provider.as_ref(), a).await;
-                if let Some(ref mut c) = cache {
-                    c.insert_from_result(a, model_name, options.seed, &result);
-                }
-                (result, lat)
-            }
-        } else {
-            resolve_with_retry_timed(provider.as_ref(), a).await
-        };
-        stats.record(&call_result, latency_ms, &label);
-
-        match call_result {
-            LlmCallResult::Verdict(verdict) => match verdict.verdict {
-                VerdictKind::Match => {
-                    if let Some(split_options) = split_options {
-                        match verdict
-                            .chosen_settlement_ids
-                            .filter(|c| is_valid_split_choice(Some(c), split_options))
-                        {
-                            Some(mut components) => {
-                                components.sort();
-                                let settlement_id = components[0].clone();
-                                matches.push(MatchResult {
-                                    bank_credit_id: a.bank.id.clone(),
-                                    settlement_id,
-                                    components: Some(components),
-                                    confidence: a.score.max(0.8),
-                                    matched_by: MatchSource::Llm,
-                                    reasoning: Some(format!(
-                                        "LLM verdict: match (split) — {}",
-                                        verdict.reasoning
-                                    )),
-                                });
-                            }
-                            None => {
-                                exceptions.push(Exception {
-                                    record_id: a.bank.id.clone(),
-                                    source: ExceptionSource::Bank,
-                                    reason: format!(
-                                        "LLM verdict: match but invalid/missing chosenSettlementIds — {}",
-                                        verdict.reasoning
-                                    ),
-                                    exception_type: Some(DiscrepancyClass::BatchedPayout),
-                                    related_ids: Some(unique_flat(split_options)),
-                                });
-                            }
-                        }
-                    } else {
-                        matches.push(MatchResult {
-                            bank_credit_id: a.bank.id.clone(),
-                            settlement_id: a.settlement.settlement_id.clone(),
-                            components: None,
-                            confidence: a.score.max(0.8),
-                            matched_by: MatchSource::Llm,
-                            reasoning: Some(format!(
-                                "LLM verdict: match — {}",
-                                verdict.reasoning
-                            )),
-                        });
-                    }
-                }
-                VerdictKind::NoMatch => {
-                    if let Some(split_options) = split_options {
-                        exceptions.push(Exception {
-                            record_id: a.bank.id.clone(),
-                            source: ExceptionSource::Bank,
-                            reason: format!(
-                                "LLM verdict: no_match (split) — {}",
-                                verdict.reasoning
-                            ),
-                            exception_type: Some(DiscrepancyClass::BatchedPayout),
-                            related_ids: Some(unique_flat(split_options)),
-                        });
-                    } else {
-                        push_pair_exceptions(
-                            &mut exceptions,
-                            &a.bank.id,
-                            &a.settlement.settlement_id,
-                            &format!("LLM verdict: no_match — {}", verdict.reasoning),
-                            &rival_ids(a),
-                        );
-                    }
-                }
-                VerdictKind::Unsure => {
-                    push_declined_exceptions(&mut exceptions, a, &verdict.reasoning, split_options);
-                }
-            },
-            LlmCallResult::ProviderError { message, .. } => {
-                push_provider_error_exceptions(&mut exceptions, a, &message, split_options);
-            }
-        }
-    }
-
-    if let Some(ref mut cache) = cache {
-        let _ = cache.save_if_dirty();
-    }
-
-    LlmResolveResult {
-        matches,
-        exceptions,
-        enabled: true,
-        provider_name: name,
-        call_stats: Some(stats.finish()),
-    }
+    llm_resolve_with_provider(
+        ambiguous,
+        provider.as_ref(),
+        &name,
+        &LlmResolveOptions::from_select(options),
+    )
+    .await
 }

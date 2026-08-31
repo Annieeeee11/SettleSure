@@ -2,7 +2,7 @@
 
 use settlesure_data::generate_dataset;
 use settlesure_engine::{merge_llm_matches, reconcile_skip_llm};
-use settlesure_scoring::score_against_ground_truth;
+use settlesure_scoring::{check_reconciliation_invariant, score_against_ground_truth};
 use settlesure_types::{
     AmbiguityLevel, MatchResult, MatchSource, Payment, PaymentStatus, ReconcileConfig, Settlement,
     BankCredit, DEFAULT_CONFIG,
@@ -49,6 +49,7 @@ fn seed42_skip_llm_meets_baseline_gates() {
     assert_eq!(metrics.match_source_breakdown.split, 2);
     assert_eq!(metrics.match_source_breakdown.llm, 0);
     assert_eq!(metrics.match_source_breakdown.human, 0);
+    assert!(check_reconciliation_invariant(&result).is_ok());
     // Fuzzy bucket pre-filter parity: see fuzzy_bucket_parity.rs
 }
 

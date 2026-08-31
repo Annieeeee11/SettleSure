@@ -9,7 +9,8 @@ use settlesure_engine::{
 };
 use settlesure_llm::{llm_resolve, select_llm_provider, LlmSelectOptions};
 use settlesure_scoring::{
-    format_terminal, write_report, ReportPaths, KNOWN_LIMITATIONS,
+    check_reconciliation_invariant, format_terminal, write_report, ReportPaths,
+    ReconciliationInvariant, KNOWN_LIMITATIONS,
 };
 use settlesure_scoring::score_against_ground_truth;
 use settlesure_types::{
@@ -347,6 +348,7 @@ async fn run_once(
         FullReport,
         String,
         Option<settlesure_types::LlmCallStats>,
+        ReconciliationInvariant,
     ),
     settlesure_types::SettleSureError,
 > {
@@ -380,6 +382,9 @@ async fn run_once(
         },
     );
 
+    let invariant = check_reconciliation_invariant(&result)
+        .map_err(settlesure_types::SettleSureError::Message)?;
+
     let llm_enabled = selected_name != "none" && !skip_llm;
     let metrics = score_against_ground_truth(
         &result,
@@ -412,7 +417,7 @@ async fn run_once(
         eprintln!("Wrote match dump to {}", path.display());
     }
 
-    Ok((metrics, full, selected_name, llm_call_stats))
+    Ok((metrics, full, selected_name, llm_call_stats, invariant))
 }
 
 #[tokio::main]
@@ -494,12 +499,13 @@ async fn run(app: AppConfig) -> Result<(), settlesure_types::SettleSureError> {
         let mut llm_match_counts = Vec::new();
         let mut per_seed = Vec::new();
         let mut last_full: Option<FullReport> = None;
+        let mut last_invariant: Option<ReconciliationInvariant> = None;
 
         for i in 0..app.runs {
             let s = app.seed + i;
             seeds.push(s);
             let corr = if i == 0 { corrections.as_slice() } else { &[] };
-            let (with_metrics, mut with_full, with_name, with_call_stats) = run_once(
+            let (with_metrics, mut with_full, with_name, with_call_stats, with_inv) = run_once(
                 &app,
                 s,
                 false,
@@ -507,7 +513,7 @@ async fn run(app: AppConfig) -> Result<(), settlesure_types::SettleSureError> {
                 corr,
             )
             .await?;
-            let (without_metrics, _, _, _) = run_once(
+            let (without_metrics, _, _, _, _) = run_once(
                 &app,
                 s,
                 true,
@@ -543,6 +549,7 @@ async fn run(app: AppConfig) -> Result<(), settlesure_types::SettleSureError> {
             per_seed.push(ablation);
             with_full.metrics.llm_ablation = Some(per_seed.last().unwrap().clone());
             last_full = Some(with_full);
+            last_invariant = Some(with_inv);
             eprintln!(
                 "  seed {s}: recall lift {:.1}% (with {:.1}% / without {:.1}%)",
                 lift * 100.0,
@@ -573,7 +580,8 @@ async fn run(app: AppConfig) -> Result<(), settlesure_types::SettleSureError> {
                 Some(ReportPaths {
                     json_path: Some(json_s.as_ref()),
                     md_path: Some(md_s.as_ref()),
-                })
+                }),
+                last_invariant.as_ref(),
             )
         );
         return Ok(());
@@ -590,12 +598,13 @@ async fn run(app: AppConfig) -> Result<(), settlesure_types::SettleSureError> {
         let mut recalls = Vec::new();
         let mut fps = Vec::new();
         let mut last_full: Option<FullReport> = None;
+        let mut last_invariant: Option<ReconciliationInvariant> = None;
 
         for i in 0..app.runs {
             let s = app.seed + i;
             seeds.push(s);
             let corr = if i == 0 { corrections.as_slice() } else { &[] };
-            let (metrics, full, _, _) = run_once(
+            let (metrics, full, _, _, inv) = run_once(
                 &app,
                 s,
                 app.skip_llm,
@@ -608,6 +617,7 @@ async fn run(app: AppConfig) -> Result<(), settlesure_types::SettleSureError> {
             recalls.push(metrics.recall);
             fps.push(metrics.false_positive_rate);
             last_full = Some(full);
+            last_invariant = Some(inv);
             eprintln!(
                 "  seed {s}: match={:.1}% P={:.1}% R={:.1}% FP={:.1}%",
                 metrics.match_rate * 100.0,
@@ -638,7 +648,8 @@ async fn run(app: AppConfig) -> Result<(), settlesure_types::SettleSureError> {
                 Some(ReportPaths {
                     json_path: Some(json_s.as_ref()),
                     md_path: Some(md_s.as_ref()),
-                })
+                }),
+                last_invariant.as_ref(),
             )
         );
         return Ok(());
@@ -651,7 +662,7 @@ async fn run(app: AppConfig) -> Result<(), settlesure_types::SettleSureError> {
         } else {
             app.llm_provider
         };
-        let (with_metrics, mut with_full, with_name, with_call_stats) = run_once(
+        let (with_metrics, mut with_full, with_name, with_call_stats, with_inv) = run_once(
             &app,
             app.seed,
             false,
@@ -659,7 +670,7 @@ async fn run(app: AppConfig) -> Result<(), settlesure_types::SettleSureError> {
             &corrections,
         )
         .await?;
-        let (without_metrics, _, _, _) = run_once(
+        let (without_metrics, _, _, _, _) = run_once(
             &app,
             app.seed,
             true,
@@ -716,14 +727,15 @@ async fn run(app: AppConfig) -> Result<(), settlesure_types::SettleSureError> {
                 Some(ReportPaths {
                     json_path: Some(json_s.as_ref()),
                     md_path: Some(md_s.as_ref()),
-                })
+                }),
+                Some(&with_inv),
             )
         );
         return Ok(());
     }
 
     eprintln!("generating + reconciling (seed={})...", app.seed);
-    let (mut metrics, mut full, _, _) = run_once(
+    let (mut metrics, mut full, _, _, invariant) = run_once(
         &app,
         app.seed,
         app.skip_llm,
@@ -756,7 +768,8 @@ async fn run(app: AppConfig) -> Result<(), settlesure_types::SettleSureError> {
             Some(ReportPaths {
                 json_path: Some(json_s.as_ref()),
                 md_path: Some(md_s.as_ref()),
-            })
+            }),
+            Some(&invariant),
         )
     );
 
