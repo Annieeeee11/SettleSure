@@ -3,6 +3,9 @@
 use crate::exact::exact_match;
 use crate::fuzzy::{days_apart, fuzzy_match};
 use crate::integrity::integrity_check;
+use crate::release_gate::{
+    hold_llm_match_for_review, llm_eligible_for_auto_release, FUZZY_ACCEPT_THRESHOLD_FLOOR,
+};
 use crate::split::split_match;
 use settlesure_types::{
     amount_tolerance, AmbiguousCandidate, BankCredit, Correction, CorrectionDecision,
@@ -133,7 +136,9 @@ fn merge_config(partial: &ReconcileConfig) -> ReconcileConfig {
     cfg.date_window_days = partial.date_window_days;
     cfg.amount_tolerance_pct = partial.amount_tolerance_pct;
     cfg.amount_tolerance_abs = partial.amount_tolerance_abs;
-    cfg.fuzzy_accept_threshold = partial.fuzzy_accept_threshold;
+    cfg.fuzzy_accept_threshold = partial
+        .fuzzy_accept_threshold
+        .max(FUZZY_ACCEPT_THRESHOLD_FLOOR);
     cfg.ambiguous_low = partial.ambiguous_low;
     cfg.ambiguous_high = partial.ambiguous_high;
     cfg.weight_amount = partial.weight_amount;
@@ -274,9 +279,31 @@ pub fn reconcile(
         .collect();
     let (llm_accepted, llm_conflict) = merge_llm_matches(&prior_matches, &pass3.matches);
 
+    let settlement_by_id_gate: HashMap<&str, &Settlement> = settlements
+        .iter()
+        .map(|s| (s.settlement_id.as_str(), s))
+        .collect();
+    let mut gated_llm = Vec::new();
+    let mut release_gate_exceptions = Vec::new();
+    for m in llm_accepted {
+        let Some(bank) = bank_by_id.get(m.bank_credit_id.as_str()) else {
+            gated_llm.push(m);
+            continue;
+        };
+        let Some(setl) = settlement_by_id_gate.get(m.settlement_id.as_str()) else {
+            gated_llm.push(m);
+            continue;
+        };
+        if llm_eligible_for_auto_release(bank, setl, &cfg) {
+            gated_llm.push(m);
+        } else {
+            release_gate_exceptions.push(hold_llm_match_for_review(&m, bank, setl));
+        }
+    }
+
     let matches: Vec<MatchResult> = prior_matches
         .into_iter()
-        .chain(llm_accepted.iter().cloned())
+        .chain(gated_llm.iter().cloned())
         .collect();
 
     let matched_bank: HashSet<String> = matches.iter().map(|m| m.bank_credit_id.clone()).collect();
@@ -324,6 +351,7 @@ pub fn reconcile(
         .chain(pass_split.exceptions)
         .chain(pass3.exceptions)
         .chain(llm_conflict)
+        .chain(release_gate_exceptions)
         .chain(leftover_exceptions)
         .filter(|e| {
             !(e.source == ExceptionSource::Bank && matched_bank.contains(&e.record_id)
@@ -414,7 +442,7 @@ pub fn reconcile(
     ReconcileResult {
         matches,
         exceptions: deduped,
-        ambiguous_resolved: llm_accepted.len(),
+        ambiguous_resolved: gated_llm.len(),
         timing: settlesure_types::PassTiming {
             exact_ms: (exact_ms * 1000.0).round() / 1000.0,
             fuzzy_ms: (fuzzy_ms * 1000.0).round() / 1000.0,
@@ -498,6 +526,31 @@ pub fn reconcile_skip_llm(
     )
 }
 
+/// Options for batch reconciliation without CLI.
+#[derive(Debug, Clone, Default)]
+pub struct ReconcileBatchOptions {
+    pub skip_llm: bool,
+    pub corrections: Vec<Correction>,
+}
+
+/// Callable reconcile entry point for HTTP API and integrations.
+pub fn reconcile_batch(
+    payments: &[Payment],
+    settlements: &[Settlement],
+    bank_credits: &[BankCredit],
+    config: &ReconcileConfig,
+    options: &ReconcileBatchOptions,
+) -> ReconcileResult {
+    let _ = options.skip_llm;
+    reconcile_skip_llm(
+        payments,
+        settlements,
+        bank_credits,
+        config,
+        &options.corrections,
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -567,9 +620,16 @@ mod tests {
     }
 
     #[test]
-    fn accepts_free_settlements() {
+    fn accepts_free_settlements_with_corroboration() {
         let prior = vec![match_result("bank_A", "setl_1", MatchSource::Exact, None)];
-        let llm = vec![match_result("bank_B", "setl_9", MatchSource::Llm, None)];
+        let llm = vec![MatchResult {
+            bank_credit_id: "bank_B".into(),
+            settlement_id: "setl_9".into(),
+            components: None,
+            confidence: 0.95,
+            matched_by: MatchSource::Llm,
+            reasoning: Some("LLM verdict".into()),
+        }];
         let (accepted, exceptions) = merge_llm_matches(&prior, &llm);
         assert_eq!(accepted.len(), 1);
         assert!(exceptions.is_empty());

@@ -6,6 +6,7 @@ mod fuzzy;
 mod integrity;
 mod reconcile;
 mod reference;
+mod release_gate;
 mod split;
 
 pub use corrections::{load_corrections, load_corrections_with_fallback, suggest_fuzzy_threshold};
@@ -16,7 +17,12 @@ pub use fuzzy::{
 };
 pub use integrity::integrity_check;
 pub use reconcile::{
-    merge_llm_matches, reconcile, reconcile_skip_llm, settlement_ids_of, LlmPassResult,
+    merge_llm_matches, reconcile, reconcile_batch, reconcile_skip_llm, settlement_ids_of,
+    LlmPassResult, ReconcileBatchOptions,
+};
+pub use release_gate::{
+    fuzzy_eligible_for_auto_release, llm_eligible_for_auto_release,
+    FUZZY_ACCEPT_THRESHOLD_FLOOR, MIN_FUZZY_RELEASE_MARGIN, MIN_LLM_CORROBORATION_REF_SIM,
 };
 pub use reference::{levenshtein, normalize_reference, reference_similarity};
 pub use split::{find_subset_sums, split_match, split_match_default, SplitMatchResult};

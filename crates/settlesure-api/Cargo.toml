@@ -1,0 +1,30 @@
+[package]
+name = "settlesure-api"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "HTTP API for SettleSure reconciliation"
+
+[[bin]]
+name = "settlesure-api"
+path = "src/main.rs"
+
+[dependencies]
+settlesure-types = { workspace = true }
+settlesure-engine = { workspace = true }
+settlesure-scoring = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+axum = { workspace = true }
+tower-http = { workspace = true }
+dashmap = { workspace = true }
+chrono = { workspace = true }
+tower = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+tower = { workspace = true }

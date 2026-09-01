@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: settlesure-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile.api
+    envVars:
+      - key: API_KEY
+        generateValue: true
+      - key: SETTLESURE_VERSION
+        value: "2.0.0"
+    healthCheckPath: /api/health
+    plan: free
+
+  - type: web
+    name: settlesure-dashboard
+    runtime: static
+    buildCommand: npm install --prefix dashboard && npm run build --prefix dashboard
+    staticPublishPath: dashboard/dist
+    routes:
+      - type: rewrite
+        source: /api/*
+        destination: https://settlesure-api.onrender.com/api/*

@@ -74,6 +74,7 @@ flowchart LR
 | `settlesure-engine` | Exact, fuzzy, split, integrity, human corrections |
 | `settlesure-llm` | Provider selection, retry, cache, verdict log |
 | `settlesure-scoring` | Metrics, markdown/JSON reports, terminal output |
+| `settlesure-api` | HTTP API (`POST /api/v1/reconcile`, health, OpenAPI) |
 | `settlesure-cli` | Args, multi-seed ablation, file I/O |
 | `dashboard/` | Reads `report.json`; human Accept/Reject via dev API |
 

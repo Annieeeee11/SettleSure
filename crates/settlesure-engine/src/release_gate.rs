@@ -1,13 +1,10 @@
 //! Non-overridable auto-release safety floors.
-//!
-//! These constants are not exposed via CLI or config files. `merge_config` clamps
-//! fuzzy thresholds so callers cannot weaken them below these floors.
 
 use crate::fuzzy::score_pair;
 use crate::reference::reference_similarity;
 use settlesure_types::{
-    amount_tolerance, BankCredit, Exception, ExceptionSource, MatchResult, MatchSource,
-    ReconcileConfig, Settlement,
+    amount_tolerance, BankCredit, Exception, ExceptionSource, MatchResult, ReconcileConfig,
+    Settlement,
 };
 
 /// Minimum score gap between the top two fuzzy candidates for the same bank credit.
@@ -16,11 +13,13 @@ pub const MIN_FUZZY_RELEASE_MARGIN: f64 = 0.08;
 /// LLM-suggested matches require at least this UTR/reference similarity.
 pub const MIN_LLM_CORROBORATION_REF_SIM: f64 = 0.85;
 
-/// Fuzzy auto-release requires an exact amount match (net vs credited).
-pub const MIN_FUZZY_AMOUNT_SCORE: f64 = 1.0;
-
 /// Floor for `fuzzy_accept_threshold` — config cannot be set lower.
 pub const FUZZY_ACCEPT_THRESHOLD_FLOOR: f64 = 0.75;
+
+fn amounts_match_exact(bank: &BankCredit, settlement: &Settlement, config: &ReconcileConfig) -> bool {
+    let tol = amount_tolerance(bank.credited_amount, config);
+    (bank.credited_amount - settlement.net_amount).abs() <= tol
+}
 
 /// Returns true when a fuzzy-tier match may be auto-released (not routed to human).
 pub fn fuzzy_eligible_for_auto_release(
@@ -33,18 +32,7 @@ pub fn fuzzy_eligible_for_auto_release(
     if top_score < config.fuzzy_accept_threshold.max(FUZZY_ACCEPT_THRESHOLD_FLOOR) {
         return false;
     }
-    let (amount_component, _, _) = {
-        let tol = amount_tolerance(bank.credited_amount, config);
-        let diff = (bank.credited_amount - settlement.net_amount).abs();
-        (if diff <= tol && diff == 0.0 {
-            1.0
-        } else if diff <= tol {
-            1.0 - diff / tol
-        } else {
-            0.0
-        }, String::new(), false)
-    };
-    if amount_component < MIN_FUZZY_AMOUNT_SCORE {
+    if !amounts_match_exact(bank, settlement, config) {
         return false;
     }
     match runner_up_score {
@@ -73,7 +61,7 @@ pub fn llm_eligible_for_auto_release(
 
 pub fn hold_llm_match_for_review(
     m: &MatchResult,
-    bank: &BankCredit,
+    _bank: &BankCredit,
     settlement: &Settlement,
 ) -> Exception {
     Exception {

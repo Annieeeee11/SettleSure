@@ -8,6 +8,7 @@ use std::path::{Path, PathBuf};
 
 pub const KNOWN_LIMITATIONS: &[&str] = &[
     "Real CSV ingestion supports YYYY-MM-DD, DD/MM/YYYY, and DD-MM-YYYY dates only (US MM/DD/YYYY not supported).",
+    "Auto-release is gated by non-overridable safety floors: fuzzy margin ≥0.08, LLM requires UTR corroboration ≥0.85.",
     "Split matching uses amount-bucketed subset-sum (max pool 100, max combo 8) with meet-in-the-middle for large pools.",
     "Ambiguous multi-solution batches are routed to the LLM/human tier (not auto-picked).",
     "No FX conversion — currency mismatches are never auto-resolved.",

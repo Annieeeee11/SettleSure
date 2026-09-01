@@ -5,6 +5,8 @@
   "type": "module",
   "description": "Razorpay-style payment gateway settlement reconciliation (Rust engine)",
   "scripts": {
+    "api": "cargo run -p settlesure-api",
+    "api:build": "cargo build --release -p settlesure-api",
     "reconcile": "cargo run -q -p settlesure-cli --",
     "reconcile:fixtures": "cargo run -q -p settlesure-cli -- --settlement-file fixtures/real/settlements.csv --bank-file fixtures/real/bank.csv --payments-file fixtures/real/payments.csv --skip-llm",
     "reconcile:notify": "cargo run -q -p settlesure-cli -- --seed 42 --skip-llm --notify --no-banner",

@@ -1,6 +1,7 @@
 //! Pass 2: fuzzy scoring and greedy assignment.
 
 use crate::reference::reference_similarity;
+use crate::release_gate::{fuzzy_eligible_for_auto_release, hold_fuzzy_match_for_review};
 use settlesure_types::{
     amount_tolerance, AmbiguousCandidate, AmbiguousKind, AmbiguousRival, BankCredit,
     DiscrepancyClass, Exception, ExceptionSource, MatchResult, MatchSource, ReconcileConfig,
@@ -364,16 +365,54 @@ pub fn fuzzy_match(
         }
 
         if c.score >= config.fuzzy_accept_threshold {
-            resolved_bank.insert(c.bank.id.clone());
-            used_settlement.insert(c.settlement.settlement_id.clone());
-            matches.push(MatchResult {
-                bank_credit_id: c.bank.id.clone(),
-                settlement_id: c.settlement.settlement_id.clone(),
-                components: None,
-                confidence: (c.score * 10000.0).round() / 10000.0,
-                matched_by: MatchSource::Fuzzy,
-                reasoning: Some(c.reason.clone()),
-            });
+            let scores_for_bank: Vec<f64> = candidates_snapshot
+                .iter()
+                .filter(|(_, _, score, _, cm, bank, _)| {
+                    !*cm && bank.id == c.bank.id && *score >= config.ambiguous_low
+                })
+                .map(|(_, _, score, _, _, _, _)| *score)
+                .collect();
+            let mut sorted = scores_for_bank;
+            sorted.sort_by(|a, b| b.partial_cmp(a).unwrap_or(std::cmp::Ordering::Equal));
+            let runner_up = if sorted.len() >= 2 {
+                Some(sorted[1])
+            } else {
+                None
+            };
+
+            if fuzzy_eligible_for_auto_release(
+                &c.bank,
+                &c.settlement,
+                c.score,
+                runner_up,
+                config,
+            ) {
+                resolved_bank.insert(c.bank.id.clone());
+                used_settlement.insert(c.settlement.settlement_id.clone());
+                matches.push(MatchResult {
+                    bank_credit_id: c.bank.id.clone(),
+                    settlement_id: c.settlement.settlement_id.clone(),
+                    components: None,
+                    confidence: (c.score * 10000.0).round() / 10000.0,
+                    matched_by: MatchSource::Fuzzy,
+                    reasoning: Some(c.reason.clone()),
+                });
+            } else {
+                resolved_bank.insert(c.bank.id.clone());
+                used_settlement.insert(c.settlement.settlement_id.clone());
+                exceptions.push(hold_fuzzy_match_for_review(
+                    &c.bank.id,
+                    &c.settlement.settlement_id,
+                    "score margin too narrow or amount not exact — requires human review",
+                ));
+                exceptions.push(Exception {
+                    record_id: c.settlement.settlement_id.clone(),
+                    source: ExceptionSource::Settlement,
+                    reason: "paired bank credit held for human review (release gate)".into(),
+                    exception_type: None,
+                    related_ids: Some(vec![c.bank.id.clone()]),
+                });
+            }
         } else if c.score >= config.ambiguous_low && c.score < config.ambiguous_high {
             resolved_bank.insert(c.bank.id.clone());
 

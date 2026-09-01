@@ -11,6 +11,7 @@ members = [
     "crates/settlesure-scoring",
     "crates/settlesure-llm",
     "crates/settlesure-cli",
+    "crates/settlesure-api",
     "crates/settlesure-integration",
 ]
 default-members = ["crates/settlesure-cli"]
@@ -46,3 +47,7 @@ settlesure-ingest = { path = "crates/settlesure-ingest" }
 settlesure-engine = { path = "crates/settlesure-engine" }
 settlesure-scoring = { path = "crates/settlesure-scoring" }
 settlesure-llm = { path = "crates/settlesure-llm" }
+axum = { version = "0.8.1", features = ["json"] }
+tower-http = { version = "0.6.2", features = ["cors", "limit", "trace"] }
+dashmap = "6.1.0"
+tower = { version = "0.5.2", features = ["util"] }

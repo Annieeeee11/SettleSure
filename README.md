@@ -55,6 +55,7 @@ We caught and fixed results that looked good but weren't:
 3. **Docker stub binary.** Container shipped wrong binary. Fixed in Dockerfile.
 4. **Synthetic-only ingestion.** Competitors ingested real files; we only generated data. Added `settlesure-ingest` with messy CSV normalization (₹ symbols, `DD/MM/YYYY`, leading-zero UTRs).
 5. **Split pool too small for real batches.** Pool was capped at 25 with arbitrary truncation. Raised to 100 with amount-bucketing (top-40 search window) so realistic batches stay tractable.
+6. **Uncorroborated auto-release.** LLM and narrow-margin fuzzy matches could auto-release without independent signals. Added non-overridable release gates (margin + UTR corroboration).
 
 ## AI design: verifier, not matcher
 
@@ -221,6 +222,53 @@ Measured 2026-08-30 with `cargo run --release -p settlesure-cli -- --seed 42 --b
 
 Fuzzy pass dominates at scale. Amount × date bucketing reduces pairwise comparisons.
 
+## Public API (judge-testable)
+
+Deploy the Rust API to Render (`render.yaml`) or run locally:
+
+```bash
+npm run api          # http://localhost:3000
+npm run api:build    # release binary
+```
+
+### Health check
+
+```bash
+curl https://<your-api-host>/api/health
+# → { "status": "ok", "version": "2.0.0" }
+```
+
+### Reconcile
+
+```bash
+export API_KEY=your-shared-key
+curl -X POST https://<your-api-host>/api/v1/reconcile \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: $API_KEY" \
+  -H "Idempotency-Key: demo-batch-001" \
+  -d @examples/request.json
+```
+
+- **Auth:** `X-API-Key` header (set `API_KEY` env on the server). Returns `401` if missing/invalid.
+- **Size cap:** batches over **20,000** total records (payments + settlements + bank transactions) return `413`.
+- **Idempotency:** repeat requests with the same `Idempotency-Key` return the cached report (24h TTL).
+- **Contract:** `GET /openapi.json` for OpenAPI 3.0 spec.
+
+Vercel dashboard deploy can proxy `/api/*` to the Rust backend via `SETTLESURE_API_URL` (see `api/` folder).
+
+## Release gates (non-overridable)
+
+Auto-release safety floors are **constants in code**, not CLI-configurable:
+
+| Tier | Auto-release rule |
+| --- | --- |
+| Exact | UTR + amount + date exact match |
+| Fuzzy | Score ≥ 0.75 **and** exact amount **and** ≥ 0.08 margin over runner-up |
+| Split | Unique subset-sum only; multi-solution → human/LLM |
+| LLM | Never alone — requires UTR similarity ≥ 0.85 **and** amount within tolerance |
+
+Truncated or mangled UTRs may still confuse weak LLM models, but **wrong LLM verdicts no longer auto-release** — they route to human review via the corroboration gate.
+
 ## Docker
 
 ```bash
@@ -260,6 +308,7 @@ CI fails if seed 42 is suspiciously perfect (100%/100%/0% with zero LLM/human ti
 
 ## Known limitations
 
+- Truncated/mangled UTRs: LLM may still misclassify, but release gates block uncorroborated auto-release
 - Real CSV dates: `YYYY-MM-DD`, `DD/MM/YYYY`, `DD-MM-YYYY` only (US `MM/DD/YYYY` not supported)
 - Split matching: amount-bucketed subset-sum (pool ≤100, search cap 40, combo ≤8)
 - Ambiguous multi-solution batches routed to LLM/human, not auto-picked
