@@ -12,3 +12,4 @@ target/
 benchmarks/fixtures/
 .env
 *.log
+.vercel

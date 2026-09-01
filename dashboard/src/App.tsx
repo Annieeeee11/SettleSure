@@ -16,16 +16,12 @@ import type {
 import { pct } from "./types";
 import Wordmark from "./Wordmark";
 import Select from "./Select";
+import ReconcilePanel, {
+  type ReportMode,
+} from "./components/ReconcilePanel";
 import "./App.css";
 
 type Tab = "exceptions" | "matches";
-
-type PendingCorrection = {
-  recordId: string;
-  source: string;
-  decision: "accept" | "reject";
-  correctedMatchId?: string;
-};
 
 const PAGE_SIZE = 12;
 
@@ -91,24 +87,6 @@ function friendlyError(message: string): string {
     return "The dashboard couldn't reach report.json. Start the dev server and generate a report first.";
   }
   return message;
-}
-
-function findCounterpart(
-  row: Exception,
-  exceptions: Exception[],
-): string | undefined {
-  const sameReason = exceptions.filter(
-    (e) =>
-      e.reason === row.reason &&
-      e.recordId !== row.recordId &&
-      e.source !== row.source,
-  );
-  if (sameReason.length === 0) return undefined;
-  const digits = row.recordId.replace(/\D/g, "");
-  const byDigits = sameReason.find(
-    (e) => e.recordId.replace(/\D/g, "") === digits,
-  );
-  return (byDigits ?? sameReason[0])?.recordId;
 }
 
 function pageNumbers(current: number, total: number): (number | "…")[] {
@@ -191,6 +169,7 @@ function Pagination({
 
 export default function App() {
   const [report, setReport] = useState<FullReport | null>(null);
+  const [reportMode, setReportMode] = useState<ReportMode>("benchmark");
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>("exceptions");
   const [filter, setFilter] = useState("all");
@@ -199,10 +178,6 @@ export default function App() {
   );
   const [selectedMatch, setSelectedMatch] = useState<MatchResult | null>(null);
   const [sortKey, setSortKey] = useState<"source" | "type">("source");
-  const [pending, setPending] = useState<Record<string, PendingCorrection>>({});
-  const [statusMsg, setStatusMsg] = useState<string | null>(null);
-  const [rerunning, setRerunning] = useState(false);
-  const [ingesting, setIngesting] = useState(false);
   const [excPage, setExcPage] = useState(1);
   const [matchPage, setMatchPage] = useState(1);
   const [excDirection, setExcDirection] = useState(1);
@@ -228,6 +203,7 @@ export default function App() {
       })
       .then((data: FullReport) => {
         setReport(data);
+        setReportMode("benchmark");
         setError(null);
       });
   }, []);
@@ -251,16 +227,6 @@ export default function App() {
     return rows;
   }, [report, filter, sortKey]);
 
-  useEffect(() => {
-    setExcPage(1);
-    setExcDirection(1);
-    setSelectedException(null);
-  }, [filter, sortKey]);
-
-  useEffect(() => {
-    setSelectedException(null);
-  }, [tab]);
-
   const paginatedExceptions = useMemo(() => {
     const start = (excPage - 1) * PAGE_SIZE;
     return filteredExceptions.slice(start, start + PAGE_SIZE);
@@ -283,120 +249,6 @@ export default function App() {
     ];
   }, [report]);
 
-  async function sendCorrection(
-    row: Exception,
-    decision: "accept" | "reject",
-  ) {
-    const key = `${row.source}:${row.recordId}`;
-    const correctedMatchId =
-      decision === "accept"
-        ? findCounterpart(row, report?.exceptions ?? [])
-        : undefined;
-
-    const res = await fetch("/api/corrections", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        recordId: row.recordId,
-        source: row.source,
-        decision,
-        correctedMatchId,
-        score: 0.7,
-      }),
-    });
-    if (!res.ok) {
-      setStatusMsg(`Failed to write correction for ${row.recordId}`);
-      return;
-    }
-    setPending((prev) => ({
-      ...prev,
-      [key]: {
-        recordId: row.recordId,
-        source: row.source,
-        decision,
-        correctedMatchId,
-      },
-    }));
-    setStatusMsg(
-      decision === "accept"
-        ? `${row.recordId} accepted — will resolve as human match on next run`
-        : `${row.recordId} rejected — stays exception on next run`,
-    );
-  }
-
-  async function rerunWithCorrections() {
-    setRerunning(true);
-    setStatusMsg("Re-running reconcile with --apply-corrections…");
-    try {
-      const res = await fetch("/api/rerun", { method: "POST" });
-      const body = (await res.json()) as {
-        ok: boolean;
-        error?: string;
-        human?: number;
-      };
-      if (!res.ok || !body.ok) {
-        setStatusMsg(
-          body.error ??
-            "Re-run failed. From the project root run: npm run reconcile -- --seed 42 --skip-llm --apply-corrections",
-        );
-        return;
-      }
-      await loadReport();
-      setPending({});
-      setStatusMsg(
-        `Re-run complete — human matches in breakdown: ${body.human ?? "?"}`,
-      );
-    } catch {
-      setStatusMsg(
-        "Re-run API unavailable. Run: npm run reconcile -- --seed 42 --skip-llm --apply-corrections",
-      );
-    } finally {
-      setRerunning(false);
-    }
-  }
-
-  async function handleIngest(files: {
-    settlements: File;
-    bank: File;
-    payments: File;
-  }) {
-    setIngesting(true);
-    setStatusMsg(null);
-    try {
-      const read = (f: File) =>
-        new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(String(reader.result ?? ""));
-          reader.onerror = () => reject(reader.error);
-          reader.readAsText(f);
-        });
-      const [settlements, bank, payments] = await Promise.all([
-        read(files.settlements),
-        read(files.bank),
-        read(files.payments),
-      ]);
-      const res = await fetch("/api/ingest", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ settlements, bank, payments }),
-      });
-      const body = (await res.json()) as { ok: boolean; error?: string };
-      if (!res.ok || !body.ok) {
-        setStatusMsg(body.error ?? "Ingest failed");
-        return;
-      }
-      setError(null);
-      await loadReport();
-      setStatusMsg("CSV files reconciled successfully");
-    } catch (e) {
-      setStatusMsg(
-        e instanceof Error ? e.message : "Upload failed — is the dev server running?",
-      );
-    } finally {
-      setIngesting(false);
-    }
-  }
-
   if (error) {
     return (
       <div className="shell state-shell">
@@ -417,11 +269,7 @@ export default function App() {
             </button>
           }
           hint={
-            <>
-              <UploadPanel ingesting={ingesting} onIngest={handleIngest} />
-              <span className="upload-or">or run synthetic data:</span>{" "}
-              <code>npm run reconcile -- --seed 42 --skip-llm</code>
-            </>
+            <>The live demo remains available after the benchmark loads.</>
           }
         />
       </div>
@@ -452,18 +300,36 @@ export default function App() {
     breakdown.human,
   );
   const byLevel = m.byAmbiguityLevel;
-  const pendingCount = Object.keys(pending).length;
 
-  const metrics = [
-    { label: "Match rate", value: pct(m.matchRate) },
-    { label: "Precision", value: pct(m.precision) },
-    { label: "Recall", value: pct(m.recall) },
-    { label: "FP rate", value: pct(m.falsePositiveRate), danger: true },
-    {
-      label: "Throughput",
-      value: `${m.throughputRecordsPerSec.toFixed(0)}/s`,
-    },
-  ];
+  const metrics =
+    reportMode === "benchmark"
+      ? [
+          { label: "Match rate", value: pct(m.matchRate) },
+          { label: "Precision", value: pct(m.precision) },
+          { label: "Recall", value: pct(m.recall) },
+          {
+            label: "FP rate",
+            value: pct(m.falsePositiveRate),
+            danger: true,
+          },
+          {
+            label: "Throughput",
+            value: `${m.throughputRecordsPerSec.toFixed(0)}/s`,
+          },
+        ]
+      : [
+          { label: "Match rate", value: pct(m.matchRate) },
+          { label: "Matched", value: report.matches.length.toString() },
+          { label: "Exceptions", value: report.exceptions.length.toString() },
+          {
+            label: "Throughput",
+            value: `${m.throughputRecordsPerSec.toFixed(0)}/s`,
+          },
+          {
+            label: "Amount at risk",
+            value: `₹${(m.amountAtRisk ?? 0).toLocaleString("en-IN")}`,
+          },
+        ];
 
   return (
     <div className="shell">
@@ -475,15 +341,32 @@ export default function App() {
       >
         <Wordmark />
         <p className="sub">
-          {m.dataSource === "csv" ? "Real CSV data" : "Synthetic seed"} · seed{" "}
-          {m.seed} · {m.paymentCount} payments · {m.settlementCount} settlements
-          · {m.bankCount} credits
+          {reportMode === "benchmark"
+            ? `Audited benchmark · seed ${m.seed}`
+            : reportMode === "live-csv"
+              ? "Live CSV reconciliation"
+              : "Live judge sample"}{" "}
+          · {m.paymentCount} payments · {m.settlementCount} settlements ·{" "}
+          {m.bankCount} credits
           {m.amountAtRisk != null && m.amountAtRisk > 0
             ? ` · ₹${m.amountAtRisk.toFixed(2)} at risk`
             : ""}
         </p>
-        <UploadPanel ingesting={ingesting} onIngest={handleIngest} compact />
       </motion.header>
+
+      <ReconcilePanel
+        mode={reportMode}
+        onComplete={(nextReport, mode) => {
+          setReport(nextReport);
+          setReportMode(mode);
+          setError(null);
+          setTab(nextReport.exceptions.length > 0 ? "exceptions" : "matches");
+          setExcPage(1);
+          setMatchPage(1);
+          setSelectedException(null);
+          setSelectedMatch(null);
+        }}
+      />
 
       <section className="metrics" aria-label="Headline metrics">
         {metrics.map((metric, i) => (
@@ -606,34 +489,8 @@ export default function App() {
       >
         <div className="panel-head row">
           <h2>Match source</h2>
-          <motion.button
-            className="btn primary"
-            disabled={rerunning}
-            onClick={() => void rerunWithCorrections()}
-            whileTap={{ scale: rerunning ? 1 : 0.97 }}
-          >
-            {rerunning ? "Re-running…" : "Re-run with corrections"}
-          </motion.button>
+          <span className="safety-note">Hard release gates enforced</span>
         </div>
-        <AnimatePresence>
-          {statusMsg && (
-            <motion.p
-              className="status-msg"
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: "auto" }}
-              exit={{ opacity: 0, height: 0 }}
-              transition={{ duration: 0.2 }}
-            >
-              {statusMsg}
-            </motion.p>
-          )}
-        </AnimatePresence>
-        {pendingCount > 0 && (
-          <p className="panel-note">
-            {pendingCount} correction(s) queued — re-run to apply as human
-            matches.
-          </p>
-        )}
         <div className="bars">
           {(
             [
@@ -676,6 +533,7 @@ export default function App() {
             className={tab === id ? "active" : ""}
             onClick={() => {
               setTab(id);
+              setSelectedException(null);
               if (id === "exceptions") {
                 setExcPage(1);
                 setExcDirection(1);
@@ -712,7 +570,12 @@ export default function App() {
               <Select
                 label="Filter"
                 value={filter}
-                onChange={setFilter}
+                onChange={(value) => {
+                  setFilter(value);
+                  setExcPage(1);
+                  setExcDirection(1);
+                  setSelectedException(null);
+                }}
                 options={[
                   { value: "all", label: "All" },
                   ...exceptionTypes.map((t) => ({ value: t, label: t })),
@@ -721,7 +584,12 @@ export default function App() {
               <Select
                 label="Sort"
                 value={sortKey}
-                onChange={(v) => setSortKey(v as "source" | "type")}
+                onChange={(value) => {
+                  setSortKey(value as "source" | "type");
+                  setExcPage(1);
+                  setExcDirection(1);
+                  setSelectedException(null);
+                }}
                 options={[
                   { value: "source", label: "Source" },
                   { value: "type", label: "Type" },
@@ -745,7 +613,6 @@ export default function App() {
                         <th>Record</th>
                         <th>Source</th>
                         <th>Type</th>
-                        <th>Actions</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -754,11 +621,10 @@ export default function App() {
                         const selected =
                           selectedException?.recordId === e.recordId &&
                           selectedException?.source === e.source;
-                        const queued = pending[key];
                         return (
                           <tr
                             key={key}
-                            className={`clickable ${queued ? "row-pending" : ""} ${selected ? "selected" : ""}`}
+                            className={`clickable ${selected ? "selected" : ""}`}
                             onClick={() =>
                               setSelectedException(selected ? null : e)
                             }
@@ -766,34 +632,6 @@ export default function App() {
                             <td>{e.recordId}</td>
                             <td>{e.source}</td>
                             <td>{e.exceptionType ?? "—"}</td>
-                            <td onClick={(ev) => ev.stopPropagation()}>
-                              {queued ? (
-                                <span className="pending-tag">
-                                  Pending re-run ({queued.decision})
-                                </span>
-                              ) : (
-                                <>
-                                  <motion.button
-                                    className="btn accept"
-                                    onClick={() =>
-                                      void sendCorrection(e, "accept")
-                                    }
-                                    whileTap={{ scale: 0.95 }}
-                                  >
-                                    Accept
-                                  </motion.button>
-                                  <motion.button
-                                    className="btn reject"
-                                    onClick={() =>
-                                      void sendCorrection(e, "reject")
-                                    }
-                                    whileTap={{ scale: 0.95 }}
-                                  >
-                                    Reject
-                                  </motion.button>
-                                </>
-                              )}
-                            </td>
                           </tr>
                         );
                       })}
@@ -811,16 +649,7 @@ export default function App() {
             />
             <ExceptionDrawer
               exception={selectedException}
-              pending={
-                selectedException
-                  ? pending[
-                      `${selectedException.source}:${selectedException.recordId}`
-                    ]
-                  : undefined
-              }
               onClose={() => setSelectedException(null)}
-              onAccept={(row) => void sendCorrection(row, "accept")}
-              onReject={(row) => void sendCorrection(row, "reject")}
             />
           </motion.section>
         )}
@@ -934,9 +763,26 @@ export default function App() {
       </AnimatePresence>
       </div>
 
+      {report.knownLimitations.length > 0 && (
+        <section className="panel limitations" aria-label="Known limitations">
+          <div>
+            <span className="console-kicker">Transparent by design</span>
+            <h2>Known limitations</h2>
+          </div>
+          <ul>
+            {report.knownLimitations.map((limitation) => (
+              <li key={limitation}>{limitation}</li>
+            ))}
+          </ul>
+        </section>
+      )}
+
       <footer className="foot">
-        CLI remains the source of truth · this view reads{" "}
-        <code>output/report.json</code>
+        SettleSure v2 · deterministic reconciliation with non-overridable
+        release gates ·{" "}
+        <a href="/api/health" target="_blank" rel="noreferrer">
+          API health
+        </a>
       </footer>
     </div>
   );
@@ -977,16 +823,10 @@ function useIsMobile(breakpoint = 800) {
 
 function ExceptionDrawer({
   exception,
-  pending,
   onClose,
-  onAccept,
-  onReject,
 }: {
   exception: Exception | null;
-  pending?: PendingCorrection;
   onClose: () => void;
-  onAccept: (row: Exception) => void;
-  onReject: (row: Exception) => void;
 }) {
   const mobile = useIsMobile();
 
@@ -1056,28 +896,9 @@ function ExceptionDrawer({
             <p>{exception.reason}</p>
           </div>
           <div className="drawer-actions">
-            {pending ? (
-              <span className="pending-tag">
-                Pending re-run ({pending.decision})
-              </span>
-            ) : (
-              <>
-                <button
-                  type="button"
-                  className="btn accept"
-                  onClick={() => onAccept(exception)}
-                >
-                  Accept
-                </button>
-                <button
-                  type="button"
-                  className="btn reject"
-                  onClick={() => onReject(exception)}
-                >
-                  Reject
-                </button>
-              </>
-            )}
+            <span className="review-required">
+              Human review required · release blocked
+            </span>
           </div>
         </motion.aside>
       )}
@@ -1113,70 +934,6 @@ function EmptyInspector() {
         </svg>
       </div>
     </motion.div>
-  );
-}
-
-function UploadPanel({
-  ingesting,
-  onIngest,
-  compact = false,
-}: {
-  ingesting: boolean;
-  onIngest: (files: {
-    settlements: File;
-    bank: File;
-    payments: File;
-  }) => void;
-  compact?: boolean;
-}) {
-  const [settlements, setSettlements] = useState<File | null>(null);
-  const [bank, setBank] = useState<File | null>(null);
-  const [payments, setPayments] = useState<File | null>(null);
-
-  const ready = settlements && bank && payments;
-
-  return (
-    <div className={`upload-panel${compact ? " compact" : ""}`}>
-      {!compact && <p className="upload-title">Upload real CSV files</p>}
-      <div className="upload-fields">
-        <label>
-          Settlements
-          <input
-            type="file"
-            accept=".csv,text/csv"
-            onChange={(e) => setSettlements(e.target.files?.[0] ?? null)}
-          />
-        </label>
-        <label>
-          Bank
-          <input
-            type="file"
-            accept=".csv,text/csv"
-            onChange={(e) => setBank(e.target.files?.[0] ?? null)}
-          />
-        </label>
-        <label>
-          Payments
-          <input
-            type="file"
-            accept=".csv,text/csv"
-            onChange={(e) => setPayments(e.target.files?.[0] ?? null)}
-          />
-        </label>
-      </div>
-      <button
-        className="btn primary"
-        type="button"
-        disabled={!ready || ingesting}
-        onClick={() => {
-          if (settlements && bank && payments) {
-            onIngest({ settlements, bank, payments });
-          }
-        }}
-      >
-        {ingesting ? "Reconciling…" : "Reconcile CSVs"}
-      </button>
-    </div>
   );
 }
 

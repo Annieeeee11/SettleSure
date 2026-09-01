@@ -13,11 +13,22 @@ jobs:
         with:
           components: clippy
       - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: dashboard/package-lock.json
       - run: cargo test --workspace
       - run: cargo clippy --all-targets --all-features -- -D warnings
       - run: cargo run -p settlesure-cli -- --seed 42 --skip-llm --no-banner
       - name: Regression guard vs baseline
         run: node scripts/check-baseline.mjs
+      - name: Dashboard checks
+        run: |
+          npm ci --prefix dashboard
+          npm run lint --prefix dashboard
+          npm run test --prefix dashboard
+          npm run build --prefix dashboard
 
   # Optional — never blocks merge; runs when Ollama is reachable on the runner.
   llm-ablation:

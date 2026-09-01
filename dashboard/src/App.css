@@ -1212,52 +1212,206 @@ code {
   border-radius: 4px;
 }
 
-/* ── CSV upload ── */
+/* ── Live reconciliation console ── */
 
-.upload-panel {
-  margin: 1rem 0;
-  padding: 1rem;
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-sm);
-  background: rgba(255, 255, 255, 0.03);
-  text-align: left;
-}
-
-.upload-panel.compact {
-  margin: 0.75rem 0 0;
-  padding: 0.75rem;
-}
-
-.upload-title {
-  margin: 0 0 0.75rem;
-  font-size: 0.8125rem;
-  font-weight: 500;
-}
-
-.upload-fields {
+.reconcile-console {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 0.5rem;
-  margin-bottom: 0.75rem;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  gap: 1px;
+  margin: 0 0 1.25rem;
+  overflow: hidden;
+  border: 1px solid var(--glass-border-strong);
+  border-radius: 14px;
+  background: var(--glass-border);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.32);
 }
 
-.upload-fields label {
+.console-copy,
+.csv-console {
+  padding: clamp(1.25rem, 3vw, 2rem);
+  background: rgba(14, 14, 17, 0.96);
+}
+
+.console-copy {
+  background:
+    radial-gradient(circle at 15% 10%, rgba(110, 231, 160, 0.09), transparent 44%),
+    rgba(14, 14, 17, 0.98);
+}
+
+.eyebrow-row,
+.csv-console-head {
   display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-  font-size: 0.75rem;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.eyebrow-row {
   color: var(--text-secondary);
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
 }
 
-.upload-fields input[type="file"] {
-  font-size: 0.6875rem;
+.mode-badge,
+.record-count,
+.safety-note,
+.review-required {
+  border: 1px solid var(--glass-border);
+  border-radius: 999px;
+  color: var(--text-secondary);
+  font-size: 0.68rem;
+  padding: 0.25rem 0.55rem;
 }
 
-.upload-or {
+.mode-badge {
+  margin-left: auto;
+}
+
+.live-dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: var(--warn);
+  box-shadow: 0 0 0 4px rgba(251, 191, 36, 0.08);
+}
+
+.live-dot.online {
+  background: var(--positive);
+  box-shadow: 0 0 0 4px rgba(110, 231, 160, 0.08);
+}
+
+.live-dot.offline {
+  background: var(--negative);
+}
+
+.console-copy h1 {
+  max-width: 12ch;
+  margin: 1.15rem 0 0.75rem;
+  font-size: clamp(1.8rem, 4vw, 2.8rem);
+  line-height: 0.98;
+  letter-spacing: -0.055em;
+}
+
+.console-copy > p {
+  max-width: 42ch;
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.86rem;
+  line-height: 1.6;
+}
+
+.sample-cta {
+  margin-top: 1.4rem;
+}
+
+.csv-console-head {
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+
+.console-kicker {
   display: block;
-  margin-top: 0.75rem;
-  font-size: 0.75rem;
+  margin-bottom: 0.3rem;
+  color: var(--positive);
+  font-family: var(--mono);
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.csv-console h2 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.live-upload-grid {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.file-chip {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  min-width: 0;
+  padding: 0.75rem 0.85rem;
+  overflow: hidden;
+  border: 1px dashed var(--glass-border-strong);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: 0.18s ease;
+}
+
+.file-chip:hover,
+.file-chip.selected {
+  border-color: rgba(110, 231, 160, 0.38);
+  background: rgba(110, 231, 160, 0.05);
+  color: var(--text);
+}
+
+.file-chip span {
+  font-size: 0.78rem;
+}
+
+.file-chip small {
+  max-width: 55%;
+  overflow: hidden;
   color: var(--text-tertiary);
+  font-family: var(--mono);
+  font-size: 0.65rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-chip input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.reconcile-upload {
+  width: 100%;
+  margin-top: 0.75rem;
+  padding: 0.55rem 1rem;
+}
+
+.btn.secondary:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.console-status {
+  margin: 0.75rem 0 0;
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  line-height: 1.45;
+}
+
+.limitations {
+  display: grid;
+  grid-template-columns: 0.55fr 1.45fr;
+  gap: 2rem;
+}
+
+.limitations h2 {
+  margin-bottom: 0;
+}
+
+.limitations ul {
+  margin: 0;
+  padding-left: 1rem;
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+  line-height: 1.6;
+}
+
+.foot a {
+  color: var(--text);
 }
 
 /* ── Responsive ── */
@@ -1265,6 +1419,10 @@ code {
 @media (max-width: 900px) {
   .difficulty-grid {
     grid-template-columns: 1fr 1fr;
+  }
+
+  .reconcile-console {
+    grid-template-columns: 1fr;
   }
 }
 
@@ -1335,6 +1493,11 @@ code {
   .difficulty-grid,
   .ablation-grid {
     grid-template-columns: 1fr;
+  }
+
+  .limitations {
+    grid-template-columns: 1fr;
+    gap: 1rem;
   }
 
   .pagination {

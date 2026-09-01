@@ -222,5 +222,20 @@ function correctionsPlugin(): Plugin {
 
 export default defineConfig({
   plugins: [react(), correctionsPlugin()],
-  server: { port: 5173 },
+  server: {
+    port: 5173,
+    proxy: {
+      "/api/health": {
+        target: process.env.SETTLESURE_API_URL ?? "http://127.0.0.1:3000",
+        changeOrigin: true,
+      },
+      "/api/v1": {
+        target: process.env.SETTLESURE_API_URL ?? "http://127.0.0.1:3000",
+        changeOrigin: true,
+        headers: process.env.API_KEY
+          ? { "X-API-Key": process.env.API_KEY }
+          : undefined,
+      },
+    },
+  },
 });

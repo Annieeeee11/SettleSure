@@ -88,6 +88,48 @@ export interface FullReport {
   knownLimitations: string[];
 }
 
+export type PaymentStatus = "captured" | "failed" | "refunded";
+
+export interface Payment {
+  orderId: string;
+  paymentId: string;
+  amount: number;
+  currency: string;
+  status: PaymentStatus;
+  createdAt: string;
+}
+
+export interface Settlement {
+  settlementId: string;
+  paymentId: string;
+  grossAmount: number;
+  fee: number;
+  tax: number;
+  netAmount: number;
+  settledAt: string;
+  utr: string;
+  currency: string;
+}
+
+export interface BankTransaction {
+  id: string;
+  utr: string;
+  creditedAmount: number;
+  creditedAt: string;
+  currency: string;
+}
+
+export interface ReconcileRequest {
+  payments: Payment[];
+  settlements: Settlement[];
+  bankTransactions: BankTransaction[];
+}
+
+export interface ApiHealth {
+  status: "ok";
+  version: string;
+}
+
 export function pct(n: number): string {
   return `${(n * 100).toFixed(2)}%`;
 }

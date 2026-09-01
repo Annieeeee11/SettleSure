@@ -34,17 +34,24 @@ Zero variance across these 20 seeds: the hardened generator preserves the same a
 | --- | --- |
 | ![CLI reconcile output](docs/cli.png) | ![Dashboard metrics](docs/dashboard-seed42.png) |
 
+## Live judge demo
+
+Open **[razopay-three.vercel.app](https://razopay-three.vercel.app)** and click **Run live sample**. The browser calls a same-origin Vercel proxy, which injects the API key server-side and sends the batch to the Rust API on Render. The result appears directly in the dashboard with match sources, confidence, exceptions, and release-gate limitations.
+
+You can also upload settlement, bank, and payment CSVs. Parsing and normalization happen in the browser; the API key is never included in client JavaScript or browser requests. Render's free instance may take up to a minute to wake after inactivity.
+
 ## 60-second demo
 
 ```bash
-npm run sync-report    # regenerate baseline + copy to dashboard/public/report.json
-npm run dashboard      # http://localhost:5173
+npm run sync-report    # regenerate benchmark report
+npm run api            # terminal 1: http://localhost:3000
+npm run dashboard      # terminal 2: http://localhost:5173
 ```
 
 1. **Real files:** upload settlement + bank + payment CSVs in the dashboard, or `npm run reconcile:fixtures`.
 2. **Synthetic benchmark:** `cargo run -p settlesure-cli -- --seed 42 --skip-llm` runs exact, fuzzy, and split passes.
 3. **Alerting:** `SLACK_WEBHOOK_URL=... npm run reconcile:notify` fires when exceptions are found.
-4. **Human loop (separate demo):** Accept an exception, then Re-run with corrections. Do **not** use this run for headline metrics.
+4. **Safety review:** Open an exception to see why the release gate held it for human review.
 
 ## Engineering judgment
 
@@ -254,7 +261,7 @@ curl -X POST https://settlesure-api.onrender.com/api/v1/reconcile \
 - **Idempotency:** repeat requests with the same `Idempotency-Key` return the cached report (24h TTL).
 - **Contract:** `GET /openapi.json` for OpenAPI 3.0 spec.
 
-Vercel dashboard deploy can proxy `/api/*` to the Rust backend via `SETTLESURE_API_URL` (see `api/` folder).
+The [live dashboard](https://razopay-three.vercel.app) proxies `/api/*` to the Rust backend via server-side Vercel functions, keeping the Render API key out of the browser.
 
 ## Release gates (non-overridable)
 
