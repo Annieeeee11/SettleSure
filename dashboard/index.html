@@ -16,6 +16,19 @@
     />
     <meta property="og:type" content="website" />
     <title>SettleSure — Live Reconciliation</title>
+    <script>
+      (function () {
+        try {
+          var t = localStorage.getItem("theme");
+          document.documentElement.setAttribute(
+            "data-theme",
+            t === "light" || t === "dark" ? t : "dark",
+          );
+        } catch (e) {
+          document.documentElement.setAttribute("data-theme", "dark");
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

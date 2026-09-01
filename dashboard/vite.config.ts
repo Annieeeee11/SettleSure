@@ -220,7 +220,14 @@ function correctionsPlugin(): Plugin {
   };
 }
 
+const dashboardRoot = dirname(fileURLToPath(import.meta.url));
+
 export default defineConfig({
+  resolve: {
+    alias: {
+      "@": join(dashboardRoot, "src"),
+    },
+  },
   plugins: [react(), correctionsPlugin()],
   server: {
     port: 5173,
