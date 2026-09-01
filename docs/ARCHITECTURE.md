@@ -70,6 +70,7 @@ flowchart LR
 | --- | --- |
 | `settlesure-types` | Domain structs, config defaults, report wire format |
 | `settlesure-data` | Seeded adversarial generator + ground truth |
+| `settlesure-ingest` | Real CSV parsing and normalization (settlement, bank, payment) |
 | `settlesure-engine` | Exact, fuzzy, split, integrity, human corrections |
 | `settlesure-llm` | Provider selection, retry, cache, verdict log |
 | `settlesure-scoring` | Metrics, markdown/JSON reports, terminal output |
@@ -90,6 +91,7 @@ The engine builds an **ambiguous candidate list** (near-duplicate UTR pairs, mul
 Dashboard dev server exposes:
 
 - `GET/POST /api/corrections` — persist Accept/Reject to `output/corrections.json`
+- `POST /api/ingest` — upload settlement/bank/payment CSV contents, run CLI, refresh report
 - `POST /api/rerun` — re-run CLI with `--apply-corrections`
 
 Human overrides are useful for ops demos but may score as FP when GT says "do not auto-match" — baseline headline metrics always use `--skip-llm` without corrections.

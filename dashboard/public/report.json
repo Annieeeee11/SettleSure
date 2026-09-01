@@ -13,13 +13,13 @@
     "trueExceptionCount": 35,
     "predictedExceptionCount": 49,
     "correctlyFlaggedExceptions": 35,
-    "throughputRecordsPerSec": 108816.52,
+    "throughputRecordsPerSec": 11159.99,
     "timing": {
-      "exactMs": 0.089,
-      "fuzzyMs": 0.684,
-      "splitMs": 0.075,
-      "llmMs": 0.127,
-      "totalMs": 1.259
+      "exactMs": 1.062,
+      "fuzzyMs": 9.804,
+      "splitMs": 0.315,
+      "llmMs": 0.081,
+      "totalMs": 12.276
     },
     "matchSourceBreakdown": {
       "exact": 23,
@@ -31,7 +31,7 @@
     "bankCount": 60,
     "settlementCount": 77,
     "paymentCount": 77,
-    "seed": 42,
+    "seed": 61,
     "llmEnabled": false,
     "llmProvider": "none",
     "byAmbiguityLevel": {
@@ -79,7 +79,56 @@
         "deferredTotal": 15,
         "notes": "correctly flagged as exception"
       }
-    }
+    },
+    "robustness": {
+      "seeds": [
+        42,
+        43,
+        44,
+        45,
+        46,
+        47,
+        48,
+        49,
+        50,
+        51,
+        52,
+        53,
+        54,
+        55,
+        56,
+        57,
+        58,
+        59,
+        60,
+        61
+      ],
+      "matchRate": {
+        "mean": 0.8571,
+        "min": 0.8571428571428571,
+        "max": 0.8571428571428571,
+        "stdDev": 0.0
+      },
+      "precision": {
+        "mean": 1.0,
+        "min": 1.0,
+        "max": 1.0,
+        "stdDev": 0.0
+      },
+      "recall": {
+        "mean": 0.8571,
+        "min": 0.8571428571428571,
+        "max": 0.8571428571428571,
+        "stdDev": 0.0
+      },
+      "falsePositiveRate": {
+        "mean": 0.0,
+        "min": 0.0,
+        "max": 0.0,
+        "stdDev": 0.0
+      }
+    },
+    "dataSource": "synthetic"
   },
   "matches": [
     {
@@ -286,15 +335,8 @@
       "reasoning": "UTR similarity 0.92"
     },
     {
-      "bankCreditId": "bank_0020",
-      "settlementId": "setl_0020",
-      "confidence": 0.925,
-      "matchedBy": "fuzzy",
-      "reasoning": "date off by 1d"
-    },
-    {
-      "bankCreditId": "bank_0021",
-      "settlementId": "setl_0021",
+      "bankCreditId": "bank_0023",
+      "settlementId": "setl_0023",
       "confidence": 0.925,
       "matchedBy": "fuzzy",
       "reasoning": "date off by 1d"
@@ -307,43 +349,50 @@
       "reasoning": "date off by 1d"
     },
     {
-      "bankCreditId": "bank_0029",
-      "settlementId": "setl_0029",
-      "confidence": 0.9004,
+      "bankCreditId": "bank_0025",
+      "settlementId": "setl_0025",
+      "confidence": 0.8992,
       "matchedBy": "fuzzy",
       "reasoning": "amount delta within tolerance (score 0.75)"
     },
     {
       "bankCreditId": "bank_0026",
       "settlementId": "setl_0026",
-      "confidence": 0.8989,
+      "confidence": 0.8991,
       "matchedBy": "fuzzy",
       "reasoning": "amount delta within tolerance (score 0.75)"
     },
     {
-      "bankCreditId": "bank_0025",
-      "settlementId": "setl_0025",
-      "confidence": 0.8978,
-      "matchedBy": "fuzzy",
-      "reasoning": "amount delta within tolerance (score 0.74)"
-    },
-    {
       "bankCreditId": "bank_0027",
       "settlementId": "setl_0027",
-      "confidence": 0.8973,
+      "confidence": 0.8988,
       "matchedBy": "fuzzy",
-      "reasoning": "amount delta within tolerance (score 0.74)"
+      "reasoning": "amount delta within tolerance (score 0.75)"
+    },
+    {
+      "bankCreditId": "bank_0029",
+      "settlementId": "setl_0029",
+      "confidence": 0.8985,
+      "matchedBy": "fuzzy",
+      "reasoning": "amount delta within tolerance (score 0.75)"
     },
     {
       "bankCreditId": "bank_0028",
       "settlementId": "setl_0028",
-      "confidence": 0.8952,
+      "confidence": 0.8971,
       "matchedBy": "fuzzy",
       "reasoning": "amount delta within tolerance (score 0.74)"
     },
     {
-      "bankCreditId": "bank_0019",
-      "settlementId": "setl_0019",
+      "bankCreditId": "bank_0020",
+      "settlementId": "setl_0020",
+      "confidence": 0.85,
+      "matchedBy": "fuzzy",
+      "reasoning": "date off by 2d"
+    },
+    {
+      "bankCreditId": "bank_0021",
+      "settlementId": "setl_0021",
       "confidence": 0.85,
       "matchedBy": "fuzzy",
       "reasoning": "date off by 2d"
@@ -356,54 +405,54 @@
       "reasoning": "date off by 2d"
     },
     {
-      "bankCreditId": "bank_0023",
-      "settlementId": "setl_0023",
-      "confidence": 0.85,
+      "bankCreditId": "bank_0019",
+      "settlementId": "setl_0019",
+      "confidence": 0.775,
       "matchedBy": "fuzzy",
-      "reasoning": "date off by 2d"
+      "reasoning": "date off by 3d"
     },
     {
       "bankCreditId": "bank_0046",
-      "settlementId": "setl_0054",
+      "settlementId": "setl_0056",
       "components": [
-        "setl_0054",
+        "setl_0056",
         "setl_0055",
-        "setl_0056"
+        "setl_0054"
       ],
       "confidence": 1.0,
       "matchedBy": "split",
-      "reasoning": "Unique subset-sum: setl_0054 + setl_0055 + setl_0056 = 767.42"
+      "reasoning": "Unique subset-sum: setl_0056 + setl_0055 + setl_0054 = 770.34"
     },
     {
       "bankCreditId": "bank_0047",
-      "settlementId": "setl_0057",
+      "settlementId": "setl_0059",
       "components": [
-        "setl_0057",
+        "setl_0059",
         "setl_0058",
-        "setl_0059"
+        "setl_0057"
       ],
       "confidence": 1.0,
       "matchedBy": "split",
-      "reasoning": "Unique subset-sum: setl_0057 + setl_0058 + setl_0059 = 785.78"
+      "reasoning": "Unique subset-sum: setl_0059 + setl_0058 + setl_0057 = 829.67"
     }
   ],
   "exceptions": [
     {
       "recordId": "setl_0068",
       "source": "settlement",
-      "reason": "fee/tax miscalculation: netAmount 4127.24 ≠ gross(4192.03) - fee(80.05) - tax(14.41) = 4097.57",
+      "reason": "fee/tax miscalculation: netAmount 3410.86 ≠ gross(3433.21) - fee(63.98) - tax(11.52) = 3357.71",
       "exceptionType": "fee_tax_mismatch"
     },
     {
       "recordId": "setl_0069",
       "source": "settlement",
-      "reason": "fee/tax miscalculation: netAmount 361.74 ≠ gross(317.58) - fee(5.04) - tax(0.91) = 311.63",
+      "reason": "fee/tax miscalculation: netAmount 3715.64 ≠ gross(3767.15) - fee(68.67) - tax(12.36) = 3686.12",
       "exceptionType": "fee_tax_mismatch"
     },
     {
       "recordId": "setl_0070",
       "source": "settlement",
-      "reason": "fee/tax miscalculation: netAmount 1521.51 ≠ gross(1509.65) - fee(36.16) - tax(6.51) = 1466.98",
+      "reason": "fee/tax miscalculation: netAmount 3661.13 ≠ gross(3731.02) - fee(77.6) - tax(13.97) = 3639.45",
       "exceptionType": "fee_tax_mismatch"
     },
     {
@@ -597,15 +646,8 @@
     {
       "recordId": "bank_0050",
       "source": "bank",
-      "reason": "ambiguous split — LLM unavailable: ambiguous split — multiple settlement combinations sum to credit: setl_0039+setl_0060+setl_0061+setl_0062 | setl_0039+setl_0060+setl_0061+setl_0063 | setl_0039+setl_0060+setl_0062+setl_0063",
-      "exceptionType": "batched_payout",
-      "relatedIds": [
-        "setl_0039",
-        "setl_0060",
-        "setl_0061",
-        "setl_0062",
-        "setl_0063"
-      ]
+      "reason": "no plausible counterpart in window",
+      "exceptionType": "unresolvable_noise"
     },
     {
       "recordId": "bank_0051",
@@ -747,7 +789,8 @@
     }
   ],
   "knownLimitations": [
-    "Split matching uses bounded subset-sum (max pool 25, max combo 6) — demo-scale only.",
+    "Real CSV ingestion supports YYYY-MM-DD, DD/MM/YYYY, and DD-MM-YYYY dates only (US MM/DD/YYYY not supported).",
+    "Split matching uses amount-bucketed subset-sum (max pool 100, max combo 8) with meet-in-the-middle for large pools.",
     "Ambiguous multi-solution batches are routed to the LLM/human tier (not auto-picked).",
     "No FX conversion — currency mismatches are never auto-resolved.",
     "Fuzzy matching uses net/credited amount, settlement/credit dates, and UTR similarity (prefix-aware).",

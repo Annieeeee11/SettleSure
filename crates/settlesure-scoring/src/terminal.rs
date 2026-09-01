@@ -204,6 +204,11 @@ pub fn format_terminal(
     out.push(String::new());
 
     if let Some(ref r) = m.robustness {
+        let fmt_std = |mr: &settlesure_types::MetricRange| {
+            mr.std_dev
+                .map(|s| format!("σ {}", pct(s)))
+                .unwrap_or_default()
+        };
         let rob_body = vec![
             dim(&format!(
                 "seeds {}",
@@ -214,26 +219,30 @@ pub fn format_terminal(
                     .join(", ")
             )),
             format!(
-                "match  mean {}  min {}  max {}",
+                "match  mean {}  {}  min {}  max {}",
                 pct(r.match_rate.mean),
+                fmt_std(&r.match_rate),
                 pct(r.match_rate.min),
                 pct(r.match_rate.max)
             ),
             format!(
-                "prec   mean {}  min {}  max {}",
+                "prec   mean {}  {}  min {}  max {}",
                 pct(r.precision.mean),
+                fmt_std(&r.precision),
                 pct(r.precision.min),
                 pct(r.precision.max)
             ),
             format!(
-                "recall mean {}  min {}  max {}",
+                "recall mean {}  {}  min {}  max {}",
                 pct(r.recall.mean),
+                fmt_std(&r.recall),
                 pct(r.recall.min),
                 pct(r.recall.max)
             ),
             format!(
-                "FP     mean {}  min {}  max {}",
+                "FP     mean {}  {}  min {}  max {}",
                 pct(r.false_positive_rate.mean),
+                fmt_std(&r.false_positive_rate),
                 pct(r.false_positive_rate.min),
                 pct(r.false_positive_rate.max)
             ),

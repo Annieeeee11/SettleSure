@@ -58,6 +58,8 @@ export interface ScoreReport {
   seed: number;
   llmEnabled: boolean;
   llmProvider?: string;
+  dataSource?: "synthetic" | "csv";
+  amountAtRisk?: number;
   byAmbiguityLevel?: Record<AmbiguityLevel, AmbiguitySlice>;
   llmAblation?: LlmAblation;
 }

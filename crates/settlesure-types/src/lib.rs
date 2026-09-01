@@ -303,6 +303,15 @@ pub struct MetricRange {
     pub mean: f64,
     pub min: f64,
     pub max: f64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub std_dev: Option<f64>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum DataSource {
+    Synthetic,
+    Csv,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -408,6 +417,10 @@ pub struct ScoreReport {
     pub llm_ablation: Option<LlmAblationSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub llm_ablation_robustness: Option<LlmAblationRobustnessSummary>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub data_source: Option<DataSource>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub amount_at_risk: Option<f64>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

@@ -358,7 +358,113 @@ pub fn score_against_ground_truth(
         robustness: None,
         llm_ablation: None,
         llm_ablation_robustness: None,
+        data_source: Some(settlesure_types::DataSource::Synthetic),
+        amount_at_risk: None,
     }
+}
+
+/// Operational metrics for real CSV data (no ground truth).
+pub fn score_operational_with_banks(
+    result: &ReconcileResult,
+    bank_credits: &[settlesure_types::BankCredit],
+    seed: u32,
+    llm_enabled: bool,
+    llm_provider: &str,
+) -> ScoreReport {
+    let matched_count = result.matches.len();
+    let match_rate = if result.bank_count == 0 {
+        1.0
+    } else {
+        matched_count as f64 / result.bank_count as f64
+    };
+
+    let match_source_breakdown = MatchSourceBreakdown {
+        exact: result
+            .matches
+            .iter()
+            .filter(|m| m.matched_by == MatchSource::Exact)
+            .count(),
+        fuzzy: result
+            .matches
+            .iter()
+            .filter(|m| m.matched_by == MatchSource::Fuzzy)
+            .count(),
+        split: result
+            .matches
+            .iter()
+            .filter(|m| m.matched_by == MatchSource::Split)
+            .count(),
+        llm: result
+            .matches
+            .iter()
+            .filter(|m| m.matched_by == MatchSource::Llm)
+            .count(),
+        human: result
+            .matches
+            .iter()
+            .filter(|m| m.matched_by == MatchSource::Human)
+            .count(),
+    };
+
+    let total_records = result.bank_count + result.settlement_count;
+    let total_sec = (result.timing.total_ms / 1000.0).max(1e-9);
+    let throughput = {
+        let v = total_records as f64 / total_sec;
+        (v * 100.0).round() / 100.0
+    };
+
+    ScoreReport {
+        match_rate,
+        precision: match_rate,
+        recall: match_rate,
+        false_positive_rate: 0.0,
+        exception_accuracy: 0.0,
+        true_match_count: 0,
+        predicted_match_count: matched_count,
+        true_positive: matched_count,
+        false_positive: 0,
+        false_negative: 0,
+        true_exception_count: 0,
+        predicted_exception_count: result.exceptions.len(),
+        correctly_flagged_exceptions: 0,
+        throughput_records_per_sec: throughput,
+        timing: result.timing.clone(),
+        match_source_breakdown,
+        bank_count: result.bank_count,
+        settlement_count: result.settlement_count,
+        payment_count: result.payment_count,
+        seed,
+        llm_enabled,
+        llm_provider: Some(llm_provider.to_string()),
+        suggested_fuzzy_threshold: None,
+        by_ambiguity_level: BTreeMap::new(),
+        robustness: None,
+        llm_ablation: None,
+        llm_ablation_robustness: None,
+        data_source: Some(settlesure_types::DataSource::Csv),
+        amount_at_risk: Some(compute_amount_at_risk(&result.exceptions, bank_credits)),
+    }
+}
+
+/// Compute ₹ at risk from unmatched bank credits.
+pub fn compute_amount_at_risk(
+    exceptions: &[Exception],
+    bank_credits: &[settlesure_types::BankCredit],
+) -> f64 {
+    let bank_by_id: std::collections::HashMap<&str, f64> = bank_credits
+        .iter()
+        .map(|b| (b.id.as_str(), b.credited_amount))
+        .collect();
+    let mut total = 0.0f64;
+    for ex in exceptions {
+        if ex.source != settlesure_types::ExceptionSource::Bank {
+            continue;
+        }
+        if let Some(&amt) = bank_by_id.get(ex.record_id.as_str()) {
+            total += amt;
+        }
+    }
+    settlesure_types::round_money(total)
 }
 
 pub fn pct(n: f64) -> String {

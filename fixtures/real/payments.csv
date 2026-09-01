@@ -1,0 +1,4 @@
+payment_id,order_id,amount,currency,status,created_at
+pay_001 ,ord_001,"₹1,000.00",INR,captured,10/01/2025
+pay_002,ord_002,2500.00,INR,captured,2025-01-11
+pay_003,ord_003,1500.00,INR,captured,12-01-2025

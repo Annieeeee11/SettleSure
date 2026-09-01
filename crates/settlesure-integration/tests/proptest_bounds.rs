@@ -77,8 +77,8 @@ proptest! {
     }
 
     #[test]
-    fn split_pool_constant_is_25_and_combo_6(_x in 0u8..1) {
-        prop_assert_eq!(SPLIT_MAX_POOL, 25);
-        prop_assert_eq!(SPLIT_MAX_COMBO, 6);
+    fn split_pool_constant_is_100_and_combo_8(_x in 0u8..1) {
+        prop_assert_eq!(SPLIT_MAX_POOL, 100);
+        prop_assert_eq!(SPLIT_MAX_COMBO, 8);
     }
 }

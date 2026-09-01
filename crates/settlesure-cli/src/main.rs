@@ -1,22 +1,24 @@
 //! SettleSure CLI — argument parsing and orchestration only (no matching logic).
 
 mod banner;
+mod notify;
 
 use clap::Parser;
 use settlesure_data::{generate_and_write_with_opts, GenerateDatasetOpts};
 use settlesure_engine::{
     load_corrections_with_fallback, reconcile, suggest_fuzzy_threshold, LlmPassResult,
 };
+use settlesure_ingest::load_csv_dataset;
 use settlesure_llm::{llm_resolve, select_llm_provider, LlmSelectOptions};
 use settlesure_scoring::{
-    check_reconciliation_invariant, format_terminal, write_report, ReportPaths,
-    ReconciliationInvariant, KNOWN_LIMITATIONS,
+    check_reconciliation_invariant, format_terminal, score_operational_with_banks, write_report,
+    ReportPaths, ReconciliationInvariant, KNOWN_LIMITATIONS,
 };
 use settlesure_scoring::score_against_ground_truth;
 use settlesure_types::{
-    AmbiguityLevel, Correction, FullReport, GroundTruthLabel, GroundTruthLabelKind,
+    AmbiguityLevel, BankCredit, Correction, FullReport, GroundTruthLabel, GroundTruthLabelKind,
     LlmAblationRobustnessSummary, LlmAblationSide, LlmAblationSummary, LlmProviderChoice,
-    MatchResult, MetricRange, ReconcileConfig, RobustnessSummary, ScoreReport, Secret,
+    MatchResult, MetricRange, Payment, ReconcileConfig, RobustnessSummary, ScoreReport, Secret,
     Settlement, DEFAULT_CONFIG,
 };
 use std::collections::HashMap;
@@ -93,6 +95,22 @@ struct Args {
     #[arg(long, value_name = "DIR")]
     output_data_dir: Option<PathBuf>,
 
+    /// Settlement CSV file (requires --bank-file and --payments-file)
+    #[arg(long, value_name = "PATH")]
+    settlement_file: Option<PathBuf>,
+
+    /// Bank statement CSV file (requires --settlement-file and --payments-file)
+    #[arg(long, value_name = "PATH")]
+    bank_file: Option<PathBuf>,
+
+    /// Payments CSV file (requires --settlement-file and --bank-file)
+    #[arg(long, value_name = "PATH")]
+    payments_file: Option<PathBuf>,
+
+    /// Send Slack/email alert when exceptions are found (requires env vars)
+    #[arg(long)]
+    notify: bool,
+
     /// Workspace root (defaults to cwd)
     #[arg(long, hide = true)]
     root: Option<PathBuf>,
@@ -128,6 +146,10 @@ struct AppConfig {
     dump_matches: Option<String>,
     batch_scale: u32,
     output_data_dir: Option<PathBuf>,
+    settlement_file: Option<PathBuf>,
+    bank_file: Option<PathBuf>,
+    payments_file: Option<PathBuf>,
+    notify: bool,
     anthropic_api_key: Option<Secret<String>>,
     openai_api_key: Option<Secret<String>>,
 }
@@ -168,6 +190,10 @@ impl AppConfig {
             dump_matches: args.dump_matches,
             batch_scale: args.batch_scale.max(1),
             output_data_dir: args.output_data_dir,
+            settlement_file: args.settlement_file,
+            bank_file: args.bank_file,
+            payments_file: args.payments_file,
+            notify: args.notify,
             anthropic_api_key,
             openai_api_key,
         }
@@ -250,12 +276,93 @@ fn copy_report_to_dashboard(root: &Path, json_path: &Path) {
     }
 }
 
-fn mean_min_max(values: &[f64]) -> MetricRange {
-    let mean = values.iter().sum::<f64>() / values.len() as f64;
+fn metric_stats(values: &[f64]) -> MetricRange {
+    let n = values.len() as f64;
+    let mean = values.iter().sum::<f64>() / n;
+    let variance = values.iter().map(|v| (v - mean).powi(2)).sum::<f64>() / n;
+    let std_dev = variance.sqrt();
     MetricRange {
         mean: (mean * 10000.0).round() / 10000.0,
         min: values.iter().copied().fold(f64::INFINITY, f64::min),
         max: values.iter().copied().fold(f64::NEG_INFINITY, f64::max),
+        std_dev: Some((std_dev * 10000.0).round() / 10000.0),
+    }
+}
+
+fn validate_file_args(app: &AppConfig) -> Result<(), settlesure_types::SettleSureError> {
+    let files = [
+        ("--settlement-file", &app.settlement_file),
+        ("--bank-file", &app.bank_file),
+        ("--payments-file", &app.payments_file),
+    ];
+    let provided: Vec<_> = files.iter().filter(|(_, p)| p.is_some()).collect();
+    if provided.is_empty() {
+        return Ok(());
+    }
+    if provided.len() != 3 {
+        let missing: Vec<_> = files
+            .iter()
+            .filter(|(_, p)| p.is_none())
+            .map(|(name, _)| *name)
+            .collect();
+        return Err(settlesure_types::SettleSureError::Message(format!(
+            "real CSV mode requires all three file flags; missing: {}",
+            missing.join(", ")
+        )));
+    }
+    for (name, path) in files {
+        let path = path.as_ref().unwrap();
+        if !path.exists() {
+            return Err(settlesure_types::SettleSureError::Message(format!(
+                "{name} not found: {}",
+                path.display()
+            )));
+        }
+    }
+    Ok(())
+}
+
+fn is_csv_mode(app: &AppConfig) -> bool {
+    app.settlement_file.is_some()
+}
+
+struct RunData {
+    payments: Vec<Payment>,
+    settlements: Vec<Settlement>,
+    bank_credits: Vec<BankCredit>,
+    ground_truth: Vec<GroundTruthLabel>,
+}
+
+fn load_run_data(
+    app: &AppConfig,
+    seed: u32,
+) -> Result<RunData, settlesure_types::SettleSureError> {
+    if is_csv_mode(app) {
+        let csv = load_csv_dataset(
+            app.settlement_file.as_ref().unwrap(),
+            app.bank_file.as_ref().unwrap(),
+            app.payments_file.as_ref().unwrap(),
+        )?;
+        eprintln!(
+            "Loaded {} payments, {} settlements, {} bank credits from CSV.",
+            csv.payments.len(),
+            csv.settlements.len(),
+            csv.bank_credits.len()
+        );
+        Ok(RunData {
+            payments: csv.payments,
+            settlements: csv.settlements,
+            bank_credits: csv.bank_credits,
+            ground_truth: Vec::new(),
+        })
+    } else {
+        let dataset = generate_and_write_with_opts(seed, &app.data_dir(), app.generate_opts())?;
+        Ok(RunData {
+            payments: dataset.payments,
+            settlements: dataset.settlements,
+            bank_credits: dataset.bank_credits,
+            ground_truth: dataset.ground_truth,
+        })
     }
 }
 
@@ -349,10 +456,11 @@ async fn run_once(
         String,
         Option<settlesure_types::LlmCallStats>,
         ReconciliationInvariant,
+        Vec<BankCredit>,
     ),
     settlesure_types::SettleSureError,
 > {
-    let dataset = generate_and_write_with_opts(seed, &app.data_dir(), app.generate_opts())?;
+    let data = load_run_data(app, seed)?;
     let mut cfg = app.reconcile_config();
     cfg.seed = Some(seed);
     cfg.skip_llm = skip_llm;
@@ -364,9 +472,9 @@ async fn run_once(
 
     let mut llm_call_stats = None;
     let result = reconcile(
-        &dataset.payments,
-        &dataset.settlements,
-        &dataset.bank_credits,
+        &data.payments,
+        &data.settlements,
+        &data.bank_credits,
         &cfg,
         corrections,
         |ambiguous| {
@@ -386,13 +494,23 @@ async fn run_once(
         .map_err(settlesure_types::SettleSureError::Message)?;
 
     let llm_enabled = selected_name != "none" && !skip_llm;
-    let metrics = score_against_ground_truth(
-        &result,
-        &dataset.ground_truth,
-        seed,
-        llm_enabled,
-        selected_name.as_str(),
-    );
+    let metrics = if is_csv_mode(app) {
+        score_operational_with_banks(
+            &result,
+            &data.bank_credits,
+            seed,
+            llm_enabled,
+            selected_name.as_str(),
+        )
+    } else {
+        score_against_ground_truth(
+            &result,
+            &data.ground_truth,
+            seed,
+            llm_enabled,
+            selected_name.as_str(),
+        )
+    };
 
     let full = FullReport {
         metrics: metrics.clone(),
@@ -402,22 +520,31 @@ async fn run_once(
     };
 
     if let Some(ref dump_rel) = app.dump_matches {
-        let path = PathBuf::from(dump_rel);
-        let path = if path.is_absolute() {
-            path
-        } else {
-            app.root.join(path)
-        };
-        dump_matches_ndjson(
-            &path,
-            &result.matches,
-            &dataset.settlements,
-            &dataset.ground_truth,
-        )?;
-        eprintln!("Wrote match dump to {}", path.display());
+        if !is_csv_mode(app) {
+            let path = PathBuf::from(dump_rel);
+            let path = if path.is_absolute() {
+                path
+            } else {
+                app.root.join(path)
+            };
+            dump_matches_ndjson(
+                &path,
+                &result.matches,
+                &data.settlements,
+                &data.ground_truth,
+            )?;
+            eprintln!("Wrote match dump to {}", path.display());
+        }
     }
 
-    Ok((metrics, full, selected_name, llm_call_stats, invariant))
+    Ok((
+        metrics,
+        full,
+        selected_name,
+        llm_call_stats,
+        invariant,
+        data.bank_credits,
+    ))
 }
 
 #[tokio::main]
@@ -452,6 +579,13 @@ fn atty_stdout() -> bool {
 }
 
 async fn run(app: AppConfig) -> Result<(), settlesure_types::SettleSureError> {
+    validate_file_args(&app)?;
+
+    if is_csv_mode(&app) && (app.runs > 1 || app.compare_llm) {
+        return Err(settlesure_types::SettleSureError::Message(
+            "CSV mode does not support --runs or --compare-llm (no ground truth)".into(),
+        ));
+    }
     if app.generate_only {
         eprintln!(
             "Generating synthetic settlement dataset (seed={})...",
@@ -505,7 +639,7 @@ async fn run(app: AppConfig) -> Result<(), settlesure_types::SettleSureError> {
             let s = app.seed + i;
             seeds.push(s);
             let corr = if i == 0 { corrections.as_slice() } else { &[] };
-            let (with_metrics, mut with_full, with_name, with_call_stats, with_inv) = run_once(
+            let (with_metrics, mut with_full, with_name, with_call_stats, with_inv, _) = run_once(
                 &app,
                 s,
                 false,
@@ -513,7 +647,7 @@ async fn run(app: AppConfig) -> Result<(), settlesure_types::SettleSureError> {
                 corr,
             )
             .await?;
-            let (without_metrics, _, _, _, _) = run_once(
+            let (without_metrics, _, _, _, _, _) = run_once(
                 &app,
                 s,
                 true,
@@ -563,10 +697,10 @@ async fn run(app: AppConfig) -> Result<(), settlesure_types::SettleSureError> {
         })?;
         full.metrics.llm_ablation_robustness = Some(LlmAblationRobustnessSummary {
             seeds: seeds.clone(),
-            recall_lift: mean_min_max(&recall_lifts),
-            with_llm_recall: mean_min_max(&with_recalls),
-            without_llm_recall: mean_min_max(&without_recalls),
-            llm_matches: mean_min_max(&llm_match_counts),
+            recall_lift: metric_stats(&recall_lifts),
+            with_llm_recall: metric_stats(&with_recalls),
+            without_llm_recall: metric_stats(&without_recalls),
+            llm_matches: metric_stats(&llm_match_counts),
             per_seed: Some(per_seed),
         });
         let (json_path, md_path, _) = write_report(&full, &app.output_dir())?;
@@ -604,7 +738,7 @@ async fn run(app: AppConfig) -> Result<(), settlesure_types::SettleSureError> {
             let s = app.seed + i;
             seeds.push(s);
             let corr = if i == 0 { corrections.as_slice() } else { &[] };
-            let (metrics, full, _, _, inv) = run_once(
+            let (metrics, full, _, _, inv, _) = run_once(
                 &app,
                 s,
                 app.skip_llm,
@@ -632,10 +766,10 @@ async fn run(app: AppConfig) -> Result<(), settlesure_types::SettleSureError> {
         })?;
         full.metrics.robustness = Some(RobustnessSummary {
             seeds,
-            match_rate: mean_min_max(&match_rates),
-            precision: mean_min_max(&precisions),
-            recall: mean_min_max(&recalls),
-            false_positive_rate: mean_min_max(&fps),
+            match_rate: metric_stats(&match_rates),
+            precision: metric_stats(&precisions),
+            recall: metric_stats(&recalls),
+            false_positive_rate: metric_stats(&fps),
         });
         let (json_path, md_path, _) = write_report(&full, &app.output_dir())?;
         copy_report_to_dashboard(&app.root, &json_path);
@@ -662,7 +796,7 @@ async fn run(app: AppConfig) -> Result<(), settlesure_types::SettleSureError> {
         } else {
             app.llm_provider
         };
-        let (with_metrics, mut with_full, with_name, with_call_stats, with_inv) = run_once(
+        let (with_metrics, mut with_full, with_name, with_call_stats, with_inv, _) = run_once(
             &app,
             app.seed,
             false,
@@ -670,7 +804,7 @@ async fn run(app: AppConfig) -> Result<(), settlesure_types::SettleSureError> {
             &corrections,
         )
         .await?;
-        let (without_metrics, _, _, _, _) = run_once(
+        let (without_metrics, _, _, _, _, _) = run_once(
             &app,
             app.seed,
             true,
@@ -734,8 +868,13 @@ async fn run(app: AppConfig) -> Result<(), settlesure_types::SettleSureError> {
         return Ok(());
     }
 
-    eprintln!("generating + reconciling (seed={})...", app.seed);
-    let (mut metrics, mut full, _, _, invariant) = run_once(
+    let label = if is_csv_mode(&app) {
+        "reconciling CSV files"
+    } else {
+        "generating + reconciling"
+    };
+    eprintln!("{label} (seed={})...", app.seed);
+    let (mut metrics, mut full, _, _, invariant, _) = run_once(
         &app,
         app.seed,
         app.skip_llm,
@@ -754,6 +893,16 @@ async fn run(app: AppConfig) -> Result<(), settlesure_types::SettleSureError> {
 
     let (json_path, md_path, _) = write_report(&full, &app.output_dir())?;
     copy_report_to_dashboard(&app.root, &json_path);
+
+    if app.notify && !full.exceptions.is_empty() {
+        let opts = notify::NotifyOpts::from_env();
+        notify::notify_exceptions(&full, &opts).await?;
+        eprintln!(
+            "Notification sent ({} exception(s)).",
+            full.exceptions.len()
+        );
+    }
+
     info!(
         precision = metrics.precision,
         recall = metrics.recall,

@@ -202,6 +202,7 @@ export default function App() {
   const [pending, setPending] = useState<Record<string, PendingCorrection>>({});
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
   const [rerunning, setRerunning] = useState(false);
+  const [ingesting, setIngesting] = useState(false);
   const [excPage, setExcPage] = useState(1);
   const [matchPage, setMatchPage] = useState(1);
   const [excDirection, setExcDirection] = useState(1);
@@ -354,6 +355,48 @@ export default function App() {
     }
   }
 
+  async function handleIngest(files: {
+    settlements: File;
+    bank: File;
+    payments: File;
+  }) {
+    setIngesting(true);
+    setStatusMsg(null);
+    try {
+      const read = (f: File) =>
+        new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(String(reader.result ?? ""));
+          reader.onerror = () => reject(reader.error);
+          reader.readAsText(f);
+        });
+      const [settlements, bank, payments] = await Promise.all([
+        read(files.settlements),
+        read(files.bank),
+        read(files.payments),
+      ]);
+      const res = await fetch("/api/ingest", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ settlements, bank, payments }),
+      });
+      const body = (await res.json()) as { ok: boolean; error?: string };
+      if (!res.ok || !body.ok) {
+        setStatusMsg(body.error ?? "Ingest failed");
+        return;
+      }
+      setError(null);
+      await loadReport();
+      setStatusMsg("CSV files reconciled successfully");
+    } catch (e) {
+      setStatusMsg(
+        e instanceof Error ? e.message : "Upload failed — is the dev server running?",
+      );
+    } finally {
+      setIngesting(false);
+    }
+  }
+
   if (error) {
     return (
       <div className="shell state-shell">
@@ -375,7 +418,8 @@ export default function App() {
           }
           hint={
             <>
-              From the project root:{" "}
+              <UploadPanel ingesting={ingesting} onIngest={handleIngest} />
+              <span className="upload-or">or run synthetic data:</span>{" "}
               <code>npm run reconcile -- --seed 42 --skip-llm</code>
             </>
           }
@@ -431,10 +475,14 @@ export default function App() {
       >
         <Wordmark />
         <p className="sub">
-          Payment → Settlement → Bank credit · seed {m.seed} ·{" "}
-          {m.paymentCount} payments · {m.settlementCount} settlements ·{" "}
-          {m.bankCount} credits
+          {m.dataSource === "csv" ? "Real CSV data" : "Synthetic seed"} · seed{" "}
+          {m.seed} · {m.paymentCount} payments · {m.settlementCount} settlements
+          · {m.bankCount} credits
+          {m.amountAtRisk != null && m.amountAtRisk > 0
+            ? ` · ₹${m.amountAtRisk.toFixed(2)} at risk`
+            : ""}
         </p>
+        <UploadPanel ingesting={ingesting} onIngest={handleIngest} compact />
       </motion.header>
 
       <section className="metrics" aria-label="Headline metrics">
@@ -1065,6 +1113,70 @@ function EmptyInspector() {
         </svg>
       </div>
     </motion.div>
+  );
+}
+
+function UploadPanel({
+  ingesting,
+  onIngest,
+  compact = false,
+}: {
+  ingesting: boolean;
+  onIngest: (files: {
+    settlements: File;
+    bank: File;
+    payments: File;
+  }) => void;
+  compact?: boolean;
+}) {
+  const [settlements, setSettlements] = useState<File | null>(null);
+  const [bank, setBank] = useState<File | null>(null);
+  const [payments, setPayments] = useState<File | null>(null);
+
+  const ready = settlements && bank && payments;
+
+  return (
+    <div className={`upload-panel${compact ? " compact" : ""}`}>
+      {!compact && <p className="upload-title">Upload real CSV files</p>}
+      <div className="upload-fields">
+        <label>
+          Settlements
+          <input
+            type="file"
+            accept=".csv,text/csv"
+            onChange={(e) => setSettlements(e.target.files?.[0] ?? null)}
+          />
+        </label>
+        <label>
+          Bank
+          <input
+            type="file"
+            accept=".csv,text/csv"
+            onChange={(e) => setBank(e.target.files?.[0] ?? null)}
+          />
+        </label>
+        <label>
+          Payments
+          <input
+            type="file"
+            accept=".csv,text/csv"
+            onChange={(e) => setPayments(e.target.files?.[0] ?? null)}
+          />
+        </label>
+      </div>
+      <button
+        className="btn primary"
+        type="button"
+        disabled={!ready || ingesting}
+        onClick={() => {
+          if (settlements && bank && payments) {
+            onIngest({ settlements, bank, payments });
+          }
+        }}
+      >
+        {ingesting ? "Reconciling…" : "Reconcile CSVs"}
+      </button>
+    </div>
   );
 }
 

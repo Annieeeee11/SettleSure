@@ -2,7 +2,7 @@
   <img src="docs/image.png" alt="logo" />
 </p>
 
-# SettleSure: Payment Gateway Settlement Reconciliation
+# SettleSure: Watches your settlements and tells you the moment something's wrong
 
 **Razorpay AI Buildathon, [Track 04: AI Finance Controller](https://razorpay.com/buildathon/)**
 
@@ -10,13 +10,25 @@
 ![Rust](https://img.shields.io/badge/rust-1.90+-orange?style=flat&logo=rust)
 ![CI](https://github.com/Annieeeee11/SettleSure/actions/workflows/ci.yml/badge.svg)
 
-Rules handle **42/49** true matches in **~13 ms**. LLM verifies the **7** genuinely ambiguous cases rules cannot safely decide.
+Upload real settlement, bank, and payment CSVs — or run the adversarial synthetic batch. SettleSure reconciles in milliseconds, surfaces every exception with ₹ at risk, and can **Slack/email you** the moment something needs attention.
+
+Rules handle **42/49** true matches in **~13 ms** on the synthetic benchmark. LLM verifies the **7** genuinely ambiguous cases rules cannot safely decide.
 
 | Precision | Recall | FP rate | Exact / Fuzzy / Split / LLM / Human |
 | ---: | ---: | ---: | ---: |
 | **100%** | **85.71%** | **0%** | 23 / 17 / 2 / 0 / 0 |
 
 Seed 42, 77 payments / 77 settlements / 60 bank credits, `--skip-llm` baseline (no corrections).
+
+### Multi-seed robustness (seeds 42–61, `--skip-llm`, n=20)
+
+| Metric | Mean | Std Dev | Min | Max |
+| --- | ---: | ---: | ---: | ---: |
+| Precision | 100.00% | 0.00% | 100.00% | 100.00% |
+| Recall | 85.71% | 0.00% | 85.71% | 85.71% |
+| FP rate | 0.00% | 0.00% | 0.00% | 0.00% |
+
+Zero variance across these 20 seeds: the hardened generator preserves the same adversarial class layout (7 unresolved ambiguous GT matches per seed). Re-run with `npm run robustness-report`.
 
 | CLI | Dashboard |
 | --- | --- |
@@ -29,17 +41,20 @@ npm run sync-report    # regenerate baseline + copy to dashboard/public/report.j
 npm run dashboard      # http://localhost:5173
 ```
 
-1. `cargo run -p settlesure-cli -- --seed 42 --skip-llm` runs exact, fuzzy, and split passes and writes `output/report.json`.
-2. Dashboard shows match rate, precision, recall, FP rate by case difficulty, and the full exception list.
-3. **Human loop (separate demo):** Accept an exception, then Re-run with corrections. Do **not** use this run for headline metrics. FP by design on GT-exception rows.
+1. **Real files:** upload settlement + bank + payment CSVs in the dashboard, or `npm run reconcile:fixtures`.
+2. **Synthetic benchmark:** `cargo run -p settlesure-cli -- --seed 42 --skip-llm` runs exact, fuzzy, and split passes.
+3. **Alerting:** `SLACK_WEBHOOK_URL=... npm run reconcile:notify` fires when exceptions are found.
+4. **Human loop (separate demo):** Accept an exception, then Re-run with corrections. Do **not** use this run for headline metrics.
 
 ## Engineering judgment
 
-We caught and fixed three results that looked good but weren't:
+We caught and fixed results that looked good but weren't:
 
 1. **Suspicious perfect score.** 100%/100%/0% with zero LLM/human meant the adversarial batch no longer exercised fallback tiers. Generator hardened so `--skip-llm` leaves 7 ambiguous GT matches unresolved.
 2. **Transport errors mislabeled.** Connection failures showed as `"ambiguous — LLM error"`. Split into explicit `provider error` vs `declined (unsure)`.
 3. **Docker stub binary.** Container shipped wrong binary. Fixed in Dockerfile.
+4. **Synthetic-only ingestion.** Competitors ingested real files; we only generated data. Added `settlesure-ingest` with messy CSV normalization (₹ symbols, `DD/MM/YYYY`, leading-zero UTRs).
+5. **Split pool too small for real batches.** Pool was capped at 25 with arbitrary truncation. Raised to 100 with amount-bucketing (top-40 search window) so realistic batches stay tractable.
 
 ## AI design: verifier, not matcher
 
@@ -104,6 +119,7 @@ flowchart TB
     Args[CLI orchestration]
   end
   subgraph core [Rust workspace]
+    Ingest[settlesure-ingest]
     Data[settlesure-data]
     Engine[settlesure-engine]
     LLM[settlesure-llm]
@@ -114,6 +130,7 @@ flowchart TB
     Vite[React + Vite]
     ReportJSON[public/report.json]
   end
+  Args --> Ingest
   Args --> Data --> Engine
   Engine -->|"ambiguous only"| LLM
   Engine --> Scoring
@@ -140,9 +157,11 @@ Adversarial cases include near-duplicate decoys, **accept-band precision bait** 
 
 ```bash
 cargo run -p settlesure-cli -- --seed 42 --skip-llm
-# or: npm run reconcile -- --seed 42 --skip-llm
+# Real CSV files (all three required):
+npm run reconcile -- --settlement-file ./fixtures/real/settlements.csv \
+  --bank-file ./fixtures/real/bank.csv --payments-file ./fixtures/real/payments.csv --skip-llm
 npm run sync-report   # baseline + dashboard artifact + check-baseline
-npm run dashboard     # http://localhost:5173
+npm run dashboard     # http://localhost:5173 — upload CSVs in UI
 ```
 
 ### Options
@@ -160,8 +179,25 @@ npm run dashboard     # http://localhost:5173
 | `--compare-llm` | Side-by-side LLM on vs off ablation |
 | `--no-llm-cache` | Disable `output/llm-cache.json` (fresh model calls) |
 | `--batch-scale <n>` | Multiply adversarial class counts (default `1`) |
+| `--settlement-file <path>` | Settlement CSV (requires `--bank-file` + `--payments-file`) |
+| `--bank-file <path>` | Bank statement CSV |
+| `--payments-file <path>` | Payment export CSV |
+| `--notify` | Slack/email alert when exceptions found (`SLACK_WEBHOOK_URL`, optional `RESEND_API_KEY` + `NOTIFY_EMAIL_TO`) |
 
 Provider selection: `--llm-provider` → `ANTHROPIC_API_KEY` → `OPENAI_API_KEY` → Ollama → none.
+
+### Alerting
+
+```bash
+export SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...
+export DASHBOARD_URL=http://localhost:5173   # optional, included in message
+npm run reconcile:notify
+
+# Email digest (stretch):
+export RESEND_API_KEY=re_...
+export NOTIFY_EMAIL_TO=ops@example.com
+npm run reconcile -- --seed 42 --skip-llm --notify
+```
 
 ### BYOK (bring your own key)
 
@@ -224,7 +260,8 @@ CI fails if seed 42 is suspiciously perfect (100%/100%/0% with zero LLM/human ti
 
 ## Known limitations
 
-- Split matching bounded (pool ≤25, combo ≤6)
+- Real CSV dates: `YYYY-MM-DD`, `DD/MM/YYYY`, `DD-MM-YYYY` only (US `MM/DD/YYYY` not supported)
+- Split matching: amount-bucketed subset-sum (pool ≤100, search cap 40, combo ≤8)
 - Ambiguous multi-solution batches routed to LLM/human, not auto-picked
 - No FX conversion
 - Ollama residual nondeterminism possible (model/hardware)

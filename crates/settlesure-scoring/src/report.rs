@@ -7,7 +7,8 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 pub const KNOWN_LIMITATIONS: &[&str] = &[
-    "Split matching uses bounded subset-sum (max pool 25, max combo 6) — demo-scale only.",
+    "Real CSV ingestion supports YYYY-MM-DD, DD/MM/YYYY, and DD-MM-YYYY dates only (US MM/DD/YYYY not supported).",
+    "Split matching uses amount-bucketed subset-sum (max pool 100, max combo 8) with meet-in-the-middle for large pools.",
     "Ambiguous multi-solution batches are routed to the LLM/human tier (not auto-picked).",
     "No FX conversion — currency mismatches are never auto-resolved.",
     "Fuzzy matching uses net/credited amount, settlement/credit dates, and UTR similarity (prefix-aware).",
@@ -260,29 +261,36 @@ pub fn format_markdown(report: &FullReport) -> String {
                 .join(", ")
         ));
         lines.push(String::new());
-        lines.push("| Metric | Mean | Min | Max |".into());
-        lines.push("| --- | ---: | ---: | ---: |".into());
+        lines.push("| Metric | Mean | Std Dev | Min | Max |".into());
+        lines.push("| --- | ---: | ---: | ---: | ---: |".into());
+        let fmt_std = |r: &settlesure_types::MetricRange| {
+            r.std_dev.map(pct).unwrap_or_else(|| "n/a".to_string())
+        };
         lines.push(format!(
-            "| Match rate | {} | {} | {} |",
+            "| Match rate | {} | {} | {} | {} |",
             pct(r.match_rate.mean),
+            fmt_std(&r.match_rate),
             pct(r.match_rate.min),
             pct(r.match_rate.max)
         ));
         lines.push(format!(
-            "| Precision | {} | {} | {} |",
+            "| Precision | {} | {} | {} | {} |",
             pct(r.precision.mean),
+            fmt_std(&r.precision),
             pct(r.precision.min),
             pct(r.precision.max)
         ));
         lines.push(format!(
-            "| Recall | {} | {} | {} |",
+            "| Recall | {} | {} | {} | {} |",
             pct(r.recall.mean),
+            fmt_std(&r.recall),
             pct(r.recall.min),
             pct(r.recall.max)
         ));
         lines.push(format!(
-            "| FP rate | {} | {} | {} |",
+            "| FP rate | {} | {} | {} | {} |",
             pct(r.false_positive_rate.mean),
+            fmt_std(&r.false_positive_rate),
             pct(r.false_positive_rate.min),
             pct(r.false_positive_rate.max)
         ));

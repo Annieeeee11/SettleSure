@@ -1212,6 +1212,54 @@ code {
   border-radius: 4px;
 }
 
+/* ── CSV upload ── */
+
+.upload-panel {
+  margin: 1rem 0;
+  padding: 1rem;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.03);
+  text-align: left;
+}
+
+.upload-panel.compact {
+  margin: 0.75rem 0 0;
+  padding: 0.75rem;
+}
+
+.upload-title {
+  margin: 0 0 0.75rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+}
+
+.upload-fields {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.upload-fields label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.upload-fields input[type="file"] {
+  font-size: 0.6875rem;
+}
+
+.upload-or {
+  display: block;
+  margin-top: 0.75rem;
+  font-size: 0.75rem;
+  color: var(--text-tertiary);
+}
+
 /* ── Responsive ── */
 
 @media (max-width: 900px) {

@@ -4,8 +4,8 @@ use crate::LlmProviderChoice;
 use serde::{Deserialize, Serialize};
 
 /// Load-bearing split bounds (correctness + throughput).
-pub const SPLIT_MAX_POOL: usize = 25;
-pub const SPLIT_MAX_COMBO: usize = 6;
+pub const SPLIT_MAX_POOL: usize = 100;
+pub const SPLIT_MAX_COMBO: usize = 8;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

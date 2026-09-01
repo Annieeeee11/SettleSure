@@ -6,6 +6,7 @@ resolver = "2"
 members = [
     "crates/settlesure-types",
     "crates/settlesure-data",
+    "crates/settlesure-ingest",
     "crates/settlesure-engine",
     "crates/settlesure-scoring",
     "crates/settlesure-llm",
@@ -41,6 +42,7 @@ proptest = "1.6.0"
 chrono = { version = "0.4.40", default-features = false, features = ["std", "clock"] }
 settlesure-types = { path = "crates/settlesure-types" }
 settlesure-data = { path = "crates/settlesure-data" }
+settlesure-ingest = { path = "crates/settlesure-ingest" }
 settlesure-engine = { path = "crates/settlesure-engine" }
 settlesure-scoring = { path = "crates/settlesure-scoring" }
 settlesure-llm = { path = "crates/settlesure-llm" }
