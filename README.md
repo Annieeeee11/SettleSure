@@ -234,22 +234,22 @@ npm run api:build    # release binary
 ### Health check
 
 ```bash
-curl https://<your-api-host>/api/health
+curl https://settlesure-api.onrender.com/api/health
 # → { "status": "ok", "version": "2.0.0" }
 ```
 
 ### Reconcile
 
 ```bash
-export API_KEY=your-shared-key
-curl -X POST https://<your-api-host>/api/v1/reconcile \
+export API_KEY='hNBdpF/dOTk+470+j+uUGMrG22cjZ6DpsGJI4io1eCE='
+curl -X POST https://settlesure-api.onrender.com/api/v1/reconcile \
   -H "Content-Type: application/json" \
   -H "X-API-Key: $API_KEY" \
   -H "Idempotency-Key: demo-batch-001" \
   -d @examples/request.json
 ```
 
-- **Auth:** `X-API-Key` header (set `API_KEY` env on the server). Returns `401` if missing/invalid.
+- **Auth:** `X-API-Key` is required. The key above is an intentionally public, size-limited judge-demo credential, not a production secret. Missing/invalid keys return `401`.
 - **Size cap:** batches over **20,000** total records (payments + settlements + bank transactions) return `413`.
 - **Idempotency:** repeat requests with the same `Idempotency-Key` return the cached report (24h TTL).
 - **Contract:** `GET /openapi.json` for OpenAPI 3.0 spec.
