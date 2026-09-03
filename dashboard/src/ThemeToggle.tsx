@@ -10,7 +10,7 @@ function getStoredTheme(): Theme {
   } catch {
     /* ignore */
   }
-  return "dark";
+  return "light";
 }
 
 function SunIcon() {
@@ -90,7 +90,7 @@ export default function ThemeToggle() {
     if (meta) {
       meta.setAttribute(
         "content",
-        theme === "light" ? "#e0e0e0" : "#08080a",
+        theme === "light" ? "#f4f2ee" : "#1a1a1e",
       );
     }
   }, [theme]);

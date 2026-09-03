@@ -4,12 +4,12 @@ import ReconcilePanel, {
   type ReportMode,
 } from "../components/ReconcilePanel";
 import CornerActions from "../components/CornerActions";
+import BackToLanding from "../BackToLanding";
 import TabBar from "../components/TabBar";
 import AppFooter from "../sections/AppFooter";
 import DifficultySection from "../sections/DifficultySection";
 import ExceptionsPanel from "../sections/ExceptionsPanel";
 import HeroSection from "../sections/HeroSection";
-import LimitationsSection from "../sections/LimitationsSection";
 import LlmAblationSection from "../sections/LlmAblationSection";
 import MatchesPanel from "../sections/MatchesPanel";
 import MatchSourceSection from "../sections/MatchSourceSection";
@@ -99,7 +99,9 @@ export default function DashboardPage({
   }, [report]);
 
   return (
-    <div className="shell">
+    <>
+      <BackToLanding />
+      <div className="shell">
       <CornerActions />
       <HeroSection report={report} reportMode={reportMode} />
 
@@ -163,6 +165,7 @@ export default function DashboardPage({
 
       {/* <LimitationsSection report={report} /> */}
       <AppFooter />
-    </div>
+      </div>
+    </>
   );
 }

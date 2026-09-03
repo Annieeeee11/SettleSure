@@ -14,7 +14,7 @@ export default function MatchSourceSection({ report }: { report: FullReport }) {
 
   return (
     <motion.section
-      className="panel"
+      className="panel match-source"
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.4, duration: 0.4 }}
