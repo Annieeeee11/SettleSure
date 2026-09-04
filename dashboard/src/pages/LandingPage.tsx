@@ -11,9 +11,11 @@ export default function LandingPage() {
   return (
     <div className="min-h-screen select-text bg-[var(--bg)] text-[var(--text)]">
       <LandingHeader />
-      <main className="flex flex-col gap-24 pb-24 lg:gap-32 lg:pb-32">
-        <LandingHero />
-        <LandingPreview />
+      <main className="flex flex-col gap-24 pb-8 lg:gap-32 lg:pb-10">
+        <div className="flex flex-col gap-8 lg:gap-10">
+          <LandingHero />
+          <LandingPreview />
+        </div>
         <LandingPipeline />
         <LandingFeatures />
         <LandingFaq />
