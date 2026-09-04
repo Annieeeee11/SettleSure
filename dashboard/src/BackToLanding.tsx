@@ -1,3 +1,5 @@
+import { Link } from "react-router-dom";
+
 function ArrowLeftIcon() {
   return (
     <svg
@@ -19,17 +21,9 @@ function ArrowLeftIcon() {
 
 export default function BackToLanding() {
   return (
-    <a
-      className="back-to-landing"
-      href="#"
-      aria-label="Back to landing page"
-      onClick={(event) => {
-        event.preventDefault();
-        window.location.hash = "";
-      }}
-    >
+    <Link className="back-to-landing" to="/" aria-label="Back to landing page">
       <ArrowLeftIcon />
       <span>Back</span>
-    </a>
+    </Link>
   );
 }

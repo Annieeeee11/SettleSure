@@ -1,37 +1,15 @@
-import { useReport } from "./hooks/useReport";
-import DashboardPage from "./pages/DashboardPage";
-import ErrorPage from "./pages/ErrorPage";
-import LoadingPage from "./pages/LoadingPage";
+import { Route, Routes } from "react-router-dom";
+import DashboardRoute from "./pages/DashboardRoute";
+import LandingPage from "./pages/LandingPage";
+import NotFoundPage from "./pages/NotFoundPage";
 import "./App.css";
 
 export default function App() {
-  const {
-    report,
-    reportMode,
-    error,
-    setReport,
-    setReportMode,
-    setError,
-    retry,
-  } = useReport();
-
-  if (error) {
-    return <ErrorPage error={error} onRetry={retry} />;
-  }
-
-  if (!report) {
-    return <LoadingPage />;
-  }
-
   return (
-    <DashboardPage
-      report={report}
-      reportMode={reportMode}
-      onReportComplete={(nextReport, mode) => {
-        setReport(nextReport);
-        setReportMode(mode);
-        setError(null);
-      }}
-    />
+    <Routes>
+      <Route path="/" element={<LandingPage />} />
+      <Route path="/dashboard" element={<DashboardRoute />} />
+      <Route path="*" element={<NotFoundPage />} />
+    </Routes>
   );
 }
