@@ -1,5 +1,6 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
+import tailwindcss from "@tailwindcss/vite";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawn } from "node:child_process";
@@ -228,7 +229,7 @@ export default defineConfig({
       "@": join(dashboardRoot, "src"),
     },
   },
-  plugins: [react(), correctionsPlugin()],
+  plugins: [react(), tailwindcss(), correctionsPlugin()],
   server: {
     port: 5173,
     proxy: {

@@ -1,3 +1,5 @@
+import { goToLanding } from "./hooks/useRoute";
+
 function ArrowLeftIcon() {
   return (
     <svg
@@ -21,11 +23,11 @@ export default function BackToLanding() {
   return (
     <a
       className="back-to-landing"
-      href="#"
+      href="/"
       aria-label="Back to landing page"
       onClick={(event) => {
         event.preventDefault();
-        window.location.hash = "";
+        goToLanding();
       }}
     >
       <ArrowLeftIcon />
