@@ -1,3 +1,11 @@
+import { motion, useReducedMotion } from "framer-motion";
+import {
+  reducedFade,
+  staggerContainer,
+  staggerItem,
+  VIEWPORT,
+} from "./landingMotion";
+
 interface Props {
   eyebrow: string;
   title: string;
@@ -5,17 +13,34 @@ interface Props {
 }
 
 export default function SectionHead({ eyebrow, title, desc }: Props) {
+  const reduce = useReducedMotion();
+
   return (
-    <div className="mx-auto mb-8 max-w-2xl text-center">
-      <p className="mb-3 font-mono text-[0.6875rem] font-semibold uppercase tracking-widest text-orange-500">
+    <motion.div
+      className="mx-auto mb-8 max-w-2xl text-center"
+      initial="hidden"
+      whileInView="visible"
+      viewport={VIEWPORT}
+      variants={reduce ? reducedFade : staggerContainer}
+    >
+      <motion.p
+        className="mb-3 font-mono text-[0.6875rem] font-semibold uppercase tracking-widest text-orange-500"
+        variants={reduce ? reducedFade : staggerItem}
+      >
         {eyebrow}
-      </p>
-      <h2 className="mb-3 text-3xl font-semibold tracking-tight sm:text-4xl">
+      </motion.p>
+      <motion.h2
+        className="mb-3 text-3xl font-semibold tracking-tight sm:text-4xl"
+        variants={reduce ? reducedFade : staggerItem}
+      >
         {title}
-      </h2>
-      <p className="text-[0.9375rem] leading-relaxed text-[var(--text-secondary)]">
+      </motion.h2>
+      <motion.p
+        className="text-[0.9375rem] leading-relaxed text-[var(--text-secondary)]"
+        variants={reduce ? reducedFade : staggerItem}
+      >
         {desc}
-      </p>
-    </div>
+      </motion.p>
+    </motion.div>
   );
 }

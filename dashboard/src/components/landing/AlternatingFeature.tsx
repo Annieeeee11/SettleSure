@@ -1,5 +1,12 @@
+import { motion, useReducedMotion } from "framer-motion";
 import type { PipelineShowcase } from "@/lib/landingContent";
 import PipelineVisual from "./PipelineVisual";
+import {
+  slideFromLeft,
+  slideFromRight,
+  reducedFade,
+  VIEWPORT,
+} from "./landingMotion";
 
 interface Props {
   item: PipelineShowcase;
@@ -7,8 +14,22 @@ interface Props {
 }
 
 export default function AlternatingFeature({ item, reverse = false }: Props) {
+  const reduce = useReducedMotion();
+
   const copy = (
-    <div className="max-w-md">
+    <motion.div
+      className="max-w-md"
+      initial="hidden"
+      whileInView="visible"
+      viewport={VIEWPORT}
+      variants={
+        reduce
+          ? reducedFade
+          : reverse
+            ? slideFromRight
+            : slideFromLeft
+      }
+    >
       <p className="font-mono text-[0.6875rem] font-semibold uppercase tracking-widest text-orange-500">
         {item.eyebrow}
       </p>
@@ -18,13 +39,19 @@ export default function AlternatingFeature({ item, reverse = false }: Props) {
       <p className="mt-4 text-[0.9375rem] leading-relaxed text-[var(--text-secondary)]">
         {item.desc}
       </p>
-    </div>
+    </motion.div>
   );
 
   const visual = (
-    <div className="w-full min-w-0">
+    <motion.div
+      className="w-full min-w-0"
+      initial="hidden"
+      whileInView="visible"
+      viewport={VIEWPORT}
+      variants={reduce ? reducedFade : reverse ? slideFromLeft : slideFromRight}
+    >
       <PipelineVisual kind={item.visual} />
-    </div>
+    </motion.div>
   );
 
   return (
