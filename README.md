@@ -121,35 +121,7 @@ Copy ablation output for dashboard LLM panel: `cp output/report.json dashboard/p
 
 ## Architecture
 
-```mermaid
-flowchart TB
-  subgraph cli [settlesure-cli]
-    Args[CLI orchestration]
-  end
-  subgraph core [Rust workspace]
-    Ingest[settlesure-ingest]
-    Data[settlesure-data]
-    Engine[settlesure-engine]
-    LLM[settlesure-llm]
-    Scoring[settlesure-scoring]
-    Types[settlesure-types]
-  end
-  subgraph ui [Dashboard]
-    Vite[React + Vite]
-    ReportJSON[public/report.json]
-  end
-  Args --> Ingest
-  Args --> Data --> Engine
-  Engine -->|"ambiguous only"| LLM
-  Engine --> Scoring
-  LLM --> Scoring
-  Scoring --> ReportJSON
-  Vite --> ReportJSON
-  Types --> Data
-  Types --> Engine
-  Types --> LLM
-  Types --> Scoring
-```
+<img src="docs/image-achi.png" alt="ARCHITECTURE" />
 
 Pipeline: **integrity → exact → fuzzy → split → LLM → human corrections**
 
