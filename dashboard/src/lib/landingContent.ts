@@ -138,7 +138,7 @@ export const CLI_PREVIEW = {
 
 export const HERO = {
   eyebrow: "Razorpay AI Buildathon · Finance Controller",
-  title: ["Watches your settlements.", "Tells you the moment something's wrong."],
+  title: ["It tells you what it couldn't solve.", "It doesn't guess."],
   lead:
     "Upload settlement, bank, and payment CSVs. Reconcile in milliseconds, surface every exception with ₹ at risk, and review in the dashboard or CLI.",
 } as const;
