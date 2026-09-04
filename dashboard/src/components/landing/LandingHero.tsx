@@ -1,7 +1,6 @@
 import { motion } from "framer-motion";
 import { goToDashboard } from "@/hooks/useRoute";
-import { CLI_CMD, HERO, REPO_URL } from "@/lib/landingContent";
-import CopyButton from "./CopyButton";
+import { HERO, REPO_URL } from "@/lib/landingContent";
 
 export default function LandingHero() {
   return (
@@ -53,17 +52,6 @@ export default function LandingHero() {
         >
           Clone from GitHub
         </a>
-      </motion.div>
-      <motion.div
-        className="inline-flex max-w-full items-center gap-2 rounded-full bg-[var(--surface-inset)] py-2 pl-4 pr-2 shadow-[var(--shadow-inset-sm)]"
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.45, delay: 0.2 }}
-      >
-        <code className="max-w-[min(52ch,72vw)] truncate font-mono text-[0.6875rem] text-[var(--text-secondary)]">
-          {CLI_CMD}
-        </code>
-        <CopyButton text={CLI_CMD} />
       </motion.div>
     </section>
   );

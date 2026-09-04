@@ -1,186 +1,118 @@
 import type { PipelineVisualKind } from "@/lib/landingContent";
 import { CLI_PREVIEW } from "@/lib/landingContent";
-import { FeaturePanel } from "./FeaturePanel";
-
-function TierRow({
-  tag,
-  name,
-  desc,
-  count,
-  ms,
-  active = false,
-}: {
-  tag: string;
-  name: string;
-  desc: string;
-  count?: number;
-  ms?: number;
-  active?: boolean;
-}) {
-  return (
-    <div
-      className={`flex items-center gap-4 rounded-xl border px-4 py-3 ${
-        active
-          ? "border-orange-500/30 bg-orange-500/5"
-          : "border-[var(--card-border)] bg-[var(--surface-inset)]"
-      }`}
-    >
-      <span className="w-14 shrink-0 font-mono text-[10px] uppercase tracking-widest text-[var(--text-tertiary)]">
-        {tag}
-      </span>
-      <div className="min-w-0 flex-1">
-        <p className="text-sm font-semibold">{name}</p>
-        <p className="text-xs text-[var(--text-secondary)]">{desc}</p>
-      </div>
-      {count != null ? (
-        <div className="shrink-0 text-right">
-          <p className="font-mono text-sm font-medium text-emerald-400">
-            {count} matches
-          </p>
-          {ms != null ? (
-            <p className="font-mono text-[10px] text-[var(--text-tertiary)]">
-              {ms.toFixed(1)} ms
-            </p>
-          ) : null}
-        </div>
-      ) : null}
-    </div>
-  );
-}
+import DashboardExceptionsPreview from "./DashboardExceptionsPreview";
+import {
+  TerminalBox,
+  TerminalChrome,
+  terminalBodyClass,
+} from "./TerminalUi";
 
 function DeterministicVisual() {
-  const s = CLI_PREVIEW.matchSources;
+  const d = CLI_PREVIEW;
+  const s = d.matchSources;
+
   return (
-    <FeaturePanel title="match pipeline">
-      <div className="space-y-2.5">
-        <TierRow
-          tag="Tier 1"
-          name="Exact"
-          desc="UTR + amount + date match"
-          count={s.exact}
-          ms={s.timing.exact}
-          active
-        />
-        <TierRow
-          tag="Tier 2"
-          name="Fuzzy"
-          desc="Near-duplicate references"
-          count={s.fuzzy}
-          ms={s.timing.fuzzy}
-          active
-        />
-        <TierRow
-          tag="Tier 3"
-          name="Split"
-          desc="Subset-sum payout groups"
-          count={s.split}
-          ms={s.timing.split}
-          active
-        />
-        <TierRow tag="Tier 4" name="LLM" desc="Ambiguous cases only" count={s.llm} />
-        <TierRow tag="Tier 5" name="Human" desc="Ops override + audit" count={s.human} />
+    <TerminalChrome>
+      <div className={terminalBodyClass}>
+        <p className="mb-4 text-zinc-600">
+          {"  status  "}
+          <span className="font-semibold text-zinc-300">seed {d.status.seed}</span>
+          {" · "}
+          {d.status.payments} pay / {d.status.settlements} setl / {d.status.bank}{" "}
+          bank · LLM:{" "}
+          <span className="text-amber-400">{d.status.llm}</span>
+        </p>
+
+        <TerminalBox title="match sources">
+          <p>
+            <span className="text-cyan-400">Exact</span> {s.exact}
+            {"  ·  "}
+            <span className="text-cyan-400">Fuzzy</span> {s.fuzzy}
+            {"  ·  "}
+            <span className="text-cyan-400">Split</span> {s.split}
+            {"  ·  "}
+            <span className="text-cyan-400">LLM</span> {s.llm}
+            {"  ·  "}
+            <span className="text-cyan-400">Human</span> {s.human}
+          </p>
+          <p className="text-zinc-600">
+            timing exact {s.timing.exact.toFixed(1)} · fuzzy{" "}
+            {s.timing.fuzzy.toFixed(1)} · split {s.timing.split.toFixed(1)} · llm{" "}
+            {s.timing.llm.toFixed(1)} ms
+          </p>
+        </TerminalBox>
+
+        <TerminalBox title="by difficulty">
+          {d.difficulty.map((row) => (
+            <p key={row.label}>
+              <span className="inline-block w-28 text-zinc-300">{row.label}</span>
+              <span className="inline-block w-24">
+                match {row.match.padStart(7)}
+              </span>
+              <span className="inline-block w-24">
+                prec {row.prec.padStart(7)}
+              </span>
+              deferred {row.deferred.padStart(7)}
+            </p>
+          ))}
+        </TerminalBox>
+
+        <p className="mt-1 text-zinc-600">
+          {"  runtime  "}
+          {d.metrics.runtimeMs.toFixed(1)} ms · {d.metrics.throughput.toFixed(2)}{" "}
+          rec/s
+        </p>
       </div>
-      <p className="mt-4 font-mono text-[11px] text-[var(--text-tertiary)]">
-        seed 42 · 42/49 matched · LLM: none · 15.0 ms total
-      </p>
-    </FeaturePanel>
+    </TerminalChrome>
   );
 }
 
 function LlmVisual() {
-  const deferred = CLI_PREVIEW.exceptions.preview.filter((ex) =>
+  const d = CLI_PREVIEW;
+  const deferred = d.exceptions.preview.filter((ex) =>
     ex.reason.includes("ambiguous"),
   );
 
   return (
-    <FeaturePanel title="release gate">
-      <div className="mb-4 flex items-center justify-between gap-3 rounded-xl border border-amber-500/25 bg-amber-500/5 px-4 py-3">
-        <div>
-          <p className="text-xs font-medium uppercase tracking-widest text-amber-500">
-            Tier 4
+    <TerminalChrome>
+      <div className={terminalBodyClass}>
+        <TerminalBox title="release gate · tier 4">
+          <p className="text-amber-400">LLM corroboration required · deferred</p>
+          <p className="text-zinc-600">
+            wrong verdicts cannot auto-release without corroboration
           </p>
-          <p className="text-sm font-semibold">LLM corroboration required</p>
-        </div>
-        <span className="rounded-full border border-amber-500/30 px-2.5 py-1 font-mono text-[10px] text-amber-400">
-          deferred
-        </span>
+        </TerminalBox>
+
+        <TerminalBox
+          title={`exceptions (${d.exceptions.groups} groups / ${d.exceptions.records} records)`}
+        >
+          {deferred.map((ex) => (
+            <p key={ex.ids} className="flex gap-2">
+              <span className="w-40 shrink-0 truncate text-cyan-400">{ex.ids}</span>
+              <span className="w-28 shrink-0 text-zinc-600">{ex.source}</span>
+              <span className="min-w-0 text-zinc-500">{ex.reason}</span>
+            </p>
+          ))}
+        </TerminalBox>
+
+        <p className="mt-2 text-zinc-600">
+          {"  limitations  "}
+          {d.limitations}
+        </p>
+        <p className="text-zinc-600">
+          {"  flag  "}
+          use <span className="text-zinc-300">--skip-llm</span> to defer every
+          ambiguous pair to ops
+        </p>
       </div>
-      <div className="space-y-2 font-mono text-[11px]">
-        {deferred.slice(0, 4).map((ex) => (
-          <div
-            key={ex.ids}
-            className="rounded-lg border border-[var(--card-border)] bg-[var(--surface-inset)] px-3 py-2.5"
-          >
-            <div className="mb-1 flex items-center justify-between gap-2">
-              <span className="truncate text-cyan-400">{ex.ids}</span>
-              <span className="shrink-0 text-[10px] text-amber-400">blocked</span>
-            </div>
-            <p className="text-[var(--text-secondary)]">{ex.reason}</p>
-          </div>
-        ))}
-      </div>
-      <p className="mt-4 text-xs leading-relaxed text-[var(--text-secondary)]">
-        Wrong LLM verdicts cannot auto-release. Use{" "}
-        <span className="font-mono text-[var(--text)]">--skip-llm</span> to
-        defer every ambiguous pair to ops.
-      </p>
-    </FeaturePanel>
+    </TerminalChrome>
   );
 }
 
-function HumanVisual() {
-  const queue = [
-    { id: "setl_0068", issue: "fee/tax miscalculation", risk: "₹4,127" },
-    { id: "bank_0052", issue: "currency mismatch", risk: "₹9,840" },
-    { id: "bank_0036", issue: "ambiguous pair", risk: "₹12,400" },
-  ];
-
-  return (
-    <FeaturePanel title="ops queue">
-      <div className="mb-4 flex items-center justify-between gap-3 rounded-xl border border-[var(--card-border)] bg-[var(--surface-inset)] px-4 py-3">
-        <div>
-          <p className="text-xs font-medium uppercase tracking-widest text-[var(--text-tertiary)]">
-            Tier 5
-          </p>
-          <p className="text-sm font-semibold">Human override + audit</p>
-        </div>
-        <span className="font-mono text-[10px] text-[var(--text-secondary)]">
-          3 pending
-        </span>
-      </div>
-      <div className="overflow-hidden rounded-xl border border-[var(--card-border)]">
-        <div className="grid grid-cols-[1fr_1.2fr_auto] gap-3 border-b border-[var(--card-border)] bg-[var(--surface-inset)] px-3 py-2 font-mono text-[10px] uppercase tracking-wider text-[var(--text-tertiary)]">
-          <span>Record</span>
-          <span>Issue</span>
-          <span className="text-right">At risk</span>
-        </div>
-        {queue.map((row) => (
-          <div
-            key={row.id}
-            className="grid grid-cols-[1fr_1.2fr_auto] gap-3 border-b border-[var(--card-border)] px-3 py-2.5 last:border-b-0"
-          >
-            <span className="font-mono text-[11px] text-cyan-400">{row.id}</span>
-            <span className="text-xs text-[var(--text-secondary)]">
-              {row.issue}
-            </span>
-            <span className="text-right text-xs font-medium">{row.risk}</span>
-          </div>
-        ))}
-      </div>
-      <p className="mt-4 text-xs leading-relaxed text-[var(--text-secondary)]">
-        Every release is logged with reviewer, timestamp, and prior tier verdict.
-      </p>
-    </FeaturePanel>
-  );
-}
-
-const VISUALS: Record<
-  PipelineVisualKind,
-  () => React.JSX.Element
-> = {
+const VISUALS: Record<PipelineVisualKind, () => React.JSX.Element> = {
   deterministic: DeterministicVisual,
   llm: LlmVisual,
-  human: HumanVisual,
+  human: () => <DashboardExceptionsPreview />,
 };
 
 export default function PipelineVisual({ kind }: { kind: PipelineVisualKind }) {
