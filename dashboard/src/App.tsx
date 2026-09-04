@@ -1,10 +1,12 @@
 import { useReport } from "./hooks/useReport";
+import { isDashboardRoute, useRoute } from "./hooks/useRoute";
 import DashboardPage from "./pages/DashboardPage";
 import ErrorPage from "./pages/ErrorPage";
+import LandingPage from "./pages/LandingPage";
 import LoadingPage from "./pages/LoadingPage";
 import "./App.css";
 
-export default function App() {
+function DashboardApp() {
   const {
     report,
     reportMode,
@@ -34,4 +36,14 @@ export default function App() {
       }}
     />
   );
+}
+
+export default function App() {
+  const pathname = useRoute();
+
+  if (!isDashboardRoute(pathname)) {
+    return <LandingPage />;
+  }
+
+  return <DashboardApp />;
 }
