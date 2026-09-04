@@ -65,6 +65,10 @@
   --theme-toggle-shadow: var(--shadow-raised-sm);
   --wm-solid: rgba(210, 200, 245, 0.92);
   --wm-shadow: rgba(160, 150, 200, 0.28);
+  --card-surface: #212124;
+  --card-border: #303033;
+  --card-text: #ffffff;
+  --card-muted: #8e8e93;
   --radius: 16px;
   --radius-sm: 12px;
   --font: "Inter", system-ui, -apple-system, sans-serif;
@@ -121,6 +125,10 @@
   --theme-toggle-shadow: var(--shadow-raised-sm);
   --wm-solid: #3a3a3a;
   --wm-shadow: #8a8a8a;
+  --card-surface: #f0ede8;
+  --card-border: rgba(120, 115, 105, 0.22);
+  --card-text: #3a3a3a;
+  --card-muted: #8a8a8a;
   --radius: 16px;
   --radius-sm: 12px;
 }
@@ -408,49 +416,49 @@ body {
 }
 
 .diff-card {
-  background: rgba(255, 255, 255, 0.04);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: var(--radius-sm);
-  padding: 1rem;
+  background: var(--card-surface);
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
+  padding: 1rem 1.125rem;
+  box-shadow: none;
   transition: background 0.2s ease, border-color 0.2s ease;
 }
 
 .diff-card:hover {
-  background: rgba(255, 255, 255, 0.06);
-  border-color: var(--glass-border-strong);
+  background: var(--card-surface);
+  border-color: #3a3a3e;
 }
 
 .diff-card h3 {
   margin: 0 0 0.2rem;
   font-size: 0.8125rem;
-  font-weight: 500;
+  font-weight: 600;
   letter-spacing: -0.01em;
+  color: var(--card-text);
 }
 
 .diff-sub {
   margin: 0 0 0.875rem;
   font-size: 0.6875rem;
-  color: var(--text-tertiary);
+  color: var(--card-muted);
   line-height: 1.4;
 }
 
 .diff-main {
   margin: 0;
   font-size: 0.875rem;
-  color: var(--text-secondary);
+  color: var(--card-muted);
 }
 
 .diff-main strong {
-  color: var(--text);
+  color: var(--card-text);
   font-weight: 600;
 }
 
 .diff-sec {
   margin: 0.2rem 0 0;
   font-size: 0.75rem;
-  color: var(--text-tertiary);
+  color: var(--card-muted);
 }
 
 /* ── Bar chart ── */
@@ -1574,12 +1582,11 @@ tr.clickable.selected td {
 }
 
 .ablation-grid > div {
-  background: rgba(255, 255, 255, 0.04);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: var(--radius-sm);
+  background: var(--card-surface);
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
   padding: 1rem;
+  box-shadow: none;
 }
 
 .ablation-grid h3 {
@@ -1908,19 +1915,19 @@ code {
 [data-theme="dark"] .diff-card,
 [data-theme="light"] .ablation-grid > div,
 [data-theme="dark"] .ablation-grid > div {
-  background: var(--surface-inset);
+  background: var(--card-surface);
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
-  border: none;
-  box-shadow: var(--shadow-inset-sm);
-  border-radius: 1rem;
+  border: 1px solid var(--card-border);
+  box-shadow: none;
+  border-radius: 10px;
 }
 
 [data-theme="light"] .diff-card:hover,
 [data-theme="dark"] .diff-card:hover {
-  background: var(--surface-inset);
-  border-color: transparent;
-  box-shadow: var(--shadow-inset);
+  background: var(--card-surface);
+  border-color: var(--card-border);
+  box-shadow: none;
 }
 
 [data-theme="light"] .panel.difficulty,
@@ -1938,14 +1945,16 @@ code {
 
 [data-theme="light"] .panel.difficulty .diff-card,
 [data-theme="dark"] .panel.difficulty .diff-card {
-  background: var(--surface-inset-deep);
-  box-shadow: var(--shadow-inset-nested);
+  background: var(--card-surface);
+  border: 1px solid var(--card-border);
+  box-shadow: none;
 }
 
 [data-theme="light"] .panel.difficulty .diff-card:hover,
 [data-theme="dark"] .panel.difficulty .diff-card:hover {
-  background: var(--surface-inset-deep);
-  box-shadow: var(--shadow-inset-nested);
+  background: var(--card-surface);
+  border-color: #3a3a3e;
+  box-shadow: none;
 }
 
 [data-theme="light"] .tabs,
