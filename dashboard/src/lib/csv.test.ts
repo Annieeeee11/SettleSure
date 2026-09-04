@@ -3,8 +3,10 @@ import { describe, expect, it } from "vitest";
 import {
   CsvValidationError,
   MAX_BATCH_RECORDS,
+  parseBankCsv,
   parseCsvBatch,
   parsePaymentsCsv,
+  parseSettlementsCsv,
 } from "./csv";
 
 function fixture(name: string): string {
@@ -56,5 +58,27 @@ describe("CSV normalization", () => {
 
   it("exports the same batch cap as the API", () => {
     expect(MAX_BATCH_RECORDS).toBe(20_000);
+  });
+
+  it("accepts alternate settlement and bank column names", () => {
+    const settlements = parseSettlementsCsv(
+      "settlement_id,payment_id,gross_amount,fee,tax,net_amount,settled_at,utr_reference\n" +
+        "set_1,pay_1,1000,20,4,976,2025-01-11,001234567890",
+    );
+    expect(settlements[0]).toMatchObject({
+      utr: "001234567890",
+      netAmount: 976,
+    });
+
+    const bank = parseBankCsv(
+      "bank_txn_id,utr_number,amount,credit_date\n" +
+        "txn_1,001234567890,976,2025-01-12",
+    );
+    expect(bank[0]).toMatchObject({
+      id: "txn_1",
+      utr: "001234567890",
+      creditedAmount: 976,
+      creditedAt: "2025-01-12",
+    });
   });
 });

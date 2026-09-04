@@ -174,7 +174,19 @@ export function parseSettlementsCsv(csv: string): Settlement[] {
         "settled_at",
         line,
       ),
-      utr: value(row, ["utr", "settlement_utr", "reference"], "utr", line),
+      utr: value(
+        row,
+        [
+          "utr",
+          "settlement_utr",
+          "reference",
+          "utr_reference",
+          "bank_reference",
+          "bank_ref",
+        ],
+        "utr",
+        line,
+      ),
       currency: currency(row),
     };
   });
@@ -185,14 +197,30 @@ export function parseBankCsv(csv: string): BankTransaction[] {
     const line = index + 2;
     const utr = value(
       row,
-      ["reference", "utr", "ref", "transaction_ref", "narration_ref"],
+      [
+        "reference",
+        "utr",
+        "ref",
+        "transaction_ref",
+        "narration_ref",
+        "utr_number",
+        "utr_reference",
+        "bank_reference",
+      ],
       "reference/utr",
       line,
     );
     const credit =
       value(
         row,
-        ["credit_amount", "credited_amount", "credit", "cr"],
+        [
+          "credit_amount",
+          "credited_amount",
+          "credit",
+          "cr",
+          "amount",
+          "transaction_amount",
+        ],
         "credit_amount",
         line,
         true,
@@ -202,12 +230,18 @@ export function parseBankCsv(csv: string): BankTransaction[] {
         ["debit_amount", "debit", "dr"],
         "debit_amount",
         line,
+        true,
       );
+    if (!credit) {
+      throw new CsvValidationError(
+        `Row ${line}: missing credit_amount or debit_amount (accepted columns: credit_amount, credited_amount, credit, cr, amount, transaction_amount, debit_amount, debit, dr)`,
+      );
+    }
     return {
       id:
         value(
           row,
-          ["id", "transaction_id", "txn_id"],
+          ["id", "transaction_id", "txn_id", "bank_txn_id", "bank_transaction_id"],
           "id",
           line,
           true,
@@ -217,7 +251,14 @@ export function parseBankCsv(csv: string): BankTransaction[] {
       creditedAt: date(
         value(
           row,
-          ["date", "credited_at", "transaction_date", "txn_date"],
+          [
+            "date",
+            "credited_at",
+            "transaction_date",
+            "txn_date",
+            "credit_date",
+            "value_date",
+          ],
           "credited_at",
           line,
         ),

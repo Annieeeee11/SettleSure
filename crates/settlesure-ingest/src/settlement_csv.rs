@@ -76,7 +76,14 @@ pub fn parse_settlement_csv(path: &Path) -> Result<Vec<Settlement>> {
         let utr = normalize_utr(get_col(
             row,
             &table.headers,
-            &["utr", "settlement_utr", "reference"],
+            &[
+                "utr",
+                "settlement_utr",
+                "reference",
+                "utr_reference",
+                "bank_reference",
+                "bank_ref",
+            ],
             "utr",
             line,
         )?);

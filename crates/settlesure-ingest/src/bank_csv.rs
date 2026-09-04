@@ -16,7 +16,14 @@ pub fn parse_bank_csv(path: &Path) -> Result<Vec<BankCredit>> {
             get_col(
                 row,
                 &table.headers,
-                &["date", "credited_at", "transaction_date", "txn_date"],
+                &[
+                    "date",
+                    "credited_at",
+                    "transaction_date",
+                    "txn_date",
+                    "credit_date",
+                    "value_date",
+                ],
                 "date",
                 line,
             )?,
@@ -26,7 +33,16 @@ pub fn parse_bank_csv(path: &Path) -> Result<Vec<BankCredit>> {
         let utr = normalize_utr(get_col(
             row,
             &table.headers,
-            &["reference", "utr", "ref", "transaction_ref", "narration_ref"],
+            &[
+                "reference",
+                "utr",
+                "ref",
+                "transaction_ref",
+                "narration_ref",
+                "utr_number",
+                "utr_reference",
+                "bank_reference",
+            ],
             "reference/utr",
             line,
         )?);
@@ -34,7 +50,14 @@ pub fn parse_bank_csv(path: &Path) -> Result<Vec<BankCredit>> {
         let credit_str = get_col_opt(
             row,
             &table.headers,
-            &["credit_amount", "credited_amount", "credit", "cr"],
+            &[
+                "credit_amount",
+                "credited_amount",
+                "credit",
+                "cr",
+                "amount",
+                "transaction_amount",
+            ],
         );
         let debit_str = get_col_opt(row, &table.headers, &["debit_amount", "debit", "dr"]);
 
@@ -56,7 +79,17 @@ pub fn parse_bank_csv(path: &Path) -> Result<Vec<BankCredit>> {
             }
         };
 
-        let id = get_col_opt(row, &table.headers, &["id", "transaction_id", "txn_id"])
+        let id = get_col_opt(
+            row,
+            &table.headers,
+            &[
+                "id",
+                "transaction_id",
+                "txn_id",
+                "bank_txn_id",
+                "bank_transaction_id",
+            ],
+        )
             .map(|s| s.to_string())
             .unwrap_or_else(|| format!("bank_{}_{}", i + 1, utr));
 
