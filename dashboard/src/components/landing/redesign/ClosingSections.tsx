@@ -1,5 +1,5 @@
 import { goToDashboard } from "@/hooks/useRoute";
-import { controls, repositoryUrl, twitterUrl } from "./content";
+import { controls, openExternal, repositoryUrl, xProfileUrl } from "./content";
 import { DarkGradientBg } from "./DarkGradientBg";
 import { Arrow, Brand } from "./Shared";
 
@@ -21,7 +21,7 @@ function XIcon({ className }: { className?: string }) {
 
 const socialLinks = [
   { title: "GitHub", href: repositoryUrl, icon: GitHubIcon },
-  { title: "Share on X", href: twitterUrl, icon: XIcon },
+  { title: "X", href: xProfileUrl, icon: XIcon },
 ] as const;
 
 type ControlItem = (typeof controls)[number];
@@ -123,15 +123,14 @@ export function CtaSection() {
             <ul className="mt-3 space-y-2 text-sm">
               {socialLinks.map((link) => (
                 <li key={link.title}>
-                  <a
-                    href={link.href}
-                    target="_blank"
-                    rel="noreferrer"
+                  <button
+                    type="button"
+                    onClick={() => openExternal(link.href)}
                     className="inline-flex items-center gap-1.5 text-[var(--landing-cta-muted)] transition-colors hover:text-[var(--landing-accent-strong)] md:justify-end"
                   >
                     <link.icon className="size-3.5 shrink-0" />
                     {link.title}
-                  </a>
+                  </button>
                 </li>
               ))}
             </ul>

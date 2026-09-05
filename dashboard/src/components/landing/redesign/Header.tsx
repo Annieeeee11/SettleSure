@@ -1,6 +1,6 @@
 import ThemeToggle from "@/ThemeToggle";
 import { goToDashboard } from "@/hooks/useRoute";
-import { twitterUrl } from "./content";
+import { xProfileUrl } from "./content";
 import { NavBrand, XNavButton } from "./Shared";
 import { NavBody, Navbar } from "./ResizableNavbar";
 
@@ -23,7 +23,7 @@ export default function Header() {
           </div>
           <div className="landing-nav-actions ml-auto">
             <ThemeToggle className={NAV_BTN} />
-            <XNavButton href={twitterUrl} className={NAV_BTN} />
+            <XNavButton href={xProfileUrl} className={NAV_BTN} />
           </div>
         </NavBody>
       </Navbar>

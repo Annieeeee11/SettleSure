@@ -1,6 +1,9 @@
 export const repositoryUrl = "https://github.com/Annieeeee11/SettleSure";
-export const twitterUrl =
-  "https://x.com/intent/tweet?text=SettleSure%20%E2%80%94%20deterministic%20Razorpay%20settlement%20reconciliation&url=https%3A%2F%2Fgithub.com%2FAnnieeeee11%2FSettleSure";
+export const xProfileUrl = "https://x.com/bas_karo_anaya";
+
+export function openExternal(url: string) {
+  window.open(url, "_blank", "noopener,noreferrer");
+}
 
 export const operatorSignals = [
   {

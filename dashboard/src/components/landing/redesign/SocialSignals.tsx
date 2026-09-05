@@ -40,14 +40,13 @@ function RedditPostCard({
           <CommentIcon className="size-4" />
           {item.comments} Comments
         </span>
-        <a
-          href={item.href}
-          target="_blank"
-          rel="noreferrer"
-          className="text-[12px] text-[#ff4500] hover:underline"
+        <button
+          type="button"
+          onClick={() => window.open(item.href, "_blank", "noopener,noreferrer")}
+          className="text-[12px] font-bold text-[#ff4500] hover:underline"
         >
           Open thread ↗
-        </a>
+        </button>
       </div>
     </article>
   );

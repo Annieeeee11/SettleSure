@@ -1,9 +1,10 @@
 import { goToDashboard } from "@/hooks/useRoute";
 import { CLI_PREVIEW } from "@/lib/landingContent";
+import { DarkGradientBg } from "./DarkGradientBg";
 import { Arrow } from "./Shared";
 
 const layerClass =
-  "absolute inset-x-[74px] inset-y-[34px] overflow-hidden rounded-landing border border-white/35 bg-[#111] [transform-style:preserve-3d] max-[700px]:inset-x-[70px] max-[700px]:inset-y-8";
+  "sc-stack-layer absolute inset-x-[48px] inset-y-[22px] overflow-hidden rounded-landing border border-white/12 shadow-[var(--landing-card-shadow-sm)] [transform-style:preserve-3d] max-[700px]:inset-x-[40px] max-[700px]:inset-y-5";
 const copyClass = "translate-y-[30px] opacity-0";
 const actionClass =
   "landing-btn landing-btn-primary mt-6 px-[17px] py-3 text-xs";
@@ -23,59 +24,59 @@ const STORY = {
   },
 } as const;
 
-function ThemeShot({
-  light,
-  dark,
-  className = "",
-}: {
-  light: string;
-  dark: string;
-  className?: string;
-}) {
+function ThemeShot({ light, dark }: { light: string; dark: string }) {
   return (
-    <>
+    <div className="w-full overflow-hidden rounded-landing-btn border border-white/12 bg-[var(--bg)] shadow-[0_18px_44px_rgba(0,0,0,.42)]">
       <img
         src={light}
         alt=""
-        className={`theme-dashboard-light absolute inset-0 h-full w-full object-cover object-left-top ${className}`}
+        className="theme-dashboard-light block h-auto w-full"
       />
       <img
         src={dark}
         alt=""
-        className={`theme-dashboard-dark absolute inset-0 h-full w-full object-cover object-left-top ${className}`}
+        className="theme-dashboard-dark h-auto w-full"
       />
-    </>
+    </div>
+  );
+}
+
+function ShotFrame({ light, dark }: { light: string; dark: string }) {
+  return (
+    <DarkGradientBg className="flex h-full w-full items-center justify-center p-3.5 md:p-5">
+      <ThemeShot light={light} dark={dark} />
+    </DarkGradientBg>
   );
 }
 
 function StackScene() {
   return (
     <div
-      className="sc-stack relative aspect-[1.62] w-[clamp(440px,52vw,640px)] [perspective:1100px] [transform-style:preserve-3d] will-change-transform max-[700px]:w-[min(420px,92vw)]"
+      className="sc-stack relative aspect-[1.55] w-[clamp(520px,62vw,760px)] [perspective:1100px] [transform-style:preserve-3d] will-change-transform max-[700px]:w-[min(460px,94vw)]"
       aria-hidden="true"
     >
-      <div className={`sc-stack-layer sc-layer-1 ${layerClass}`}>
-        <ThemeShot {...STORY.exception} className="opacity-45" />
+      <div className={`sc-layer-1 ${layerClass}`}>
+        <ShotFrame {...STORY.exception} />
       </div>
-      <div className={`sc-stack-layer sc-layer-2 ${layerClass}`}>
-        <ThemeShot {...STORY.matches} className="opacity-50" />
+      <div className={`sc-layer-2 ${layerClass}`}>
+        <ShotFrame {...STORY.matches} />
       </div>
-      <div className={`sc-stack-layer sc-layer-3 ${layerClass}`}>
-        <div className="sc-stack-media sc-stack-intro absolute inset-0 opacity-[0.95]">
-          <ThemeShot {...STORY.upload} />
+      <div className={`sc-layer-3 ${layerClass}`}>
+        <div className="sc-stack-media sc-stack-intro absolute inset-0">
+          <ShotFrame {...STORY.upload} />
         </div>
         <div className="sc-stack-media sc-stack-matches absolute inset-0 opacity-0">
-          <ThemeShot {...STORY.matches} />
+          <ShotFrame {...STORY.matches} />
         </div>
         <div className="sc-stack-media sc-stack-exceptions absolute inset-0 opacity-0">
-          <ThemeShot {...STORY.exception} />
+          <ShotFrame {...STORY.exception} />
         </div>
       </div>
-      <div className={`sc-stack-layer sc-layer-4 ${layerClass}`}>
-        <ThemeShot {...STORY.upload} className="opacity-40" />
+      <div className={`sc-layer-4 ${layerClass}`}>
+        <ShotFrame {...STORY.upload} />
       </div>
-      <div className={`sc-stack-layer sc-layer-5 ${layerClass}`}>
-        <ThemeShot {...STORY.matches} className="opacity-35" />
+      <div className={`sc-layer-5 ${layerClass}`}>
+        <ShotFrame {...STORY.matches} />
       </div>
     </div>
   );
@@ -88,7 +89,7 @@ export default function DepthStory() {
       className="sc-story landing-section relative mt-8 h-[320vh] overflow-x-clip max-[700px]:mt-6 max-[700px]:h-[300vh]"
     >
       <div className="sticky top-0 flex h-screen min-h-[560px] flex-col items-center justify-center overflow-hidden px-4 pt-16 pb-8 [perspective:1200px] max-[700px]:pt-14 max-[700px]:pb-6">
-        <div className="relative flex h-[min(52vh,420px)] w-full max-w-[720px] items-center justify-center">
+        <div className="relative flex h-[min(58vh,520px)] w-full max-w-[860px] items-center justify-center">
           <StackScene />
         </div>
         <div

@@ -1,7 +1,7 @@
 import { goToDashboard } from "@/hooks/useRoute";
 import { DarkGradientBg } from "./DarkGradientBg";
 import Header from "./Header";
-import { repositoryUrl } from "./content";
+import { openExternal, repositoryUrl } from "./content";
 
 export default function Hero() {
   return (
@@ -26,14 +26,13 @@ export default function Hero() {
               Reconcile now
               <span aria-hidden="true">→</span>
             </button>
-            <a
-              href={repositoryUrl}
-              target="_blank"
-              rel="noreferrer"
+            <button
+              type="button"
+              onClick={() => openExternal(repositoryUrl)}
               className="landing-btn landing-btn-secondary h-11 px-5 text-[14px] font-medium"
             >
               Clone from GitHub
-            </a>
+            </button>
           </div>
         </div>
 

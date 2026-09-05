@@ -15,7 +15,7 @@ export function useLandingAnimations(root: RefObject<HTMLDivElement | null>) {
       gsap.set(".sc-layer-2", { x: -40, z: -80, rotateY: 3 });
       gsap.set(".sc-layer-4", { x: 42, z: 80, rotateY: -3 });
       gsap.set(".sc-layer-5", { x: 84, z: 160, rotateY: -6 });
-      gsap.set(".sc-stack-intro", { opacity: 0.95 });
+      gsap.set(".sc-stack-intro", { opacity: 1 });
       gsap.set(".sc-stack-matches", { opacity: 0 });
       gsap.set(".sc-stack-exceptions", { opacity: 0 });
       gsap.set(".sc-story-intro", { opacity: 1, y: 0 });
@@ -55,7 +55,7 @@ export function useLandingAnimations(root: RefObject<HTMLDivElement | null>) {
       gsap.set(".sc-layer-3", { x: 0, z: 0, rotateY: 0 });
       gsap.set(".sc-layer-4", { x: 42, z: 80, rotateY: -3 });
       gsap.set(".sc-layer-5", { x: 84, z: 160, rotateY: -6 });
-      gsap.set(".sc-stack-intro", { opacity: 0.95 });
+      gsap.set(".sc-stack-intro", { opacity: 1 });
       gsap.set(".sc-stack-matches", { opacity: 0 });
       gsap.set(".sc-stack-exceptions", { opacity: 0 });
       gsap.set(".sc-story-intro", { opacity: 1, y: 0 });
@@ -79,7 +79,7 @@ export function useLandingAnimations(root: RefObject<HTMLDivElement | null>) {
         .to(".sc-story-intro", { opacity: 0, y: -20, duration: 0.35 }, ">")
         .to(".sc-stack", { xPercent: 32, rotateY: -10, scale: 0.74, duration: 0.55 }, "<")
         .to(".sc-stack-intro", { opacity: 0, duration: 0.3 }, "<0.05")
-        .to(".sc-stack-matches", { opacity: 0.95, duration: 0.35 }, "<0.1")
+        .to(".sc-stack-matches", { opacity: 1, duration: 0.35 }, "<0.1")
         .to(".sc-story-app", { opacity: 1, y: 0, duration: 0.35 }, "<0.12")
         // Beat 2 — hold workflow
         .to({}, { duration: 1.1 })
@@ -87,7 +87,7 @@ export function useLandingAnimations(root: RefObject<HTMLDivElement | null>) {
         .to(".sc-story-app", { opacity: 0, y: -20, duration: 0.35 }, ">")
         .to(".sc-stack", { xPercent: -32, rotateY: 10, scale: 0.72, duration: 0.55 }, "<")
         .to(".sc-stack-matches", { opacity: 0, duration: 0.3 }, "<0.05")
-        .to(".sc-stack-exceptions", { opacity: 0.95, duration: 0.35 }, "<0.1")
+        .to(".sc-stack-exceptions", { opacity: 1, duration: 0.35 }, "<0.1")
         .to(".sc-story-data", { opacity: 1, y: 0, duration: 0.35 }, "<0.12")
         // Beat 3 — hold review through the end of the section
         .to({}, { duration: 1.1 });
