@@ -19,10 +19,16 @@ function ArrowLeftIcon() {
   );
 }
 
-export default function BackToLanding() {
+export default function BackToLanding({
+  layout = "fixed",
+}: {
+  layout?: "fixed" | "inline";
+}) {
   return (
     <a
-      className="back-to-landing"
+      className={`back-to-landing landing-btn landing-btn-secondary h-9 gap-1.5 px-3 text-[12px] font-medium ${
+        layout === "inline" ? "back-to-landing-inline" : ""
+      }`}
       href="/"
       aria-label="Back to landing page"
       onClick={(event) => {

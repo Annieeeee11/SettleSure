@@ -1,9 +1,20 @@
 @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap");
 @import "tailwindcss";
 
+@font-face {
+  font-family: "Aeonik";
+  src: url("/scale-assets/aeonik.woff2") format("woff2");
+  font-weight: 400 700;
+  font-style: normal;
+  font-display: swap;
+}
+
 @theme {
   --font-sans: "Inter", system-ui, -apple-system, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
+  --font-display: "Aeonik", "Inter", system-ui, -apple-system, sans-serif;
+  --radius-landing: 1rem;
+  --radius-landing-btn: 0.75rem;
 }
 
 *,
@@ -41,4 +52,200 @@ textarea,
 
 body::-webkit-scrollbar {
   display: none;
+}
+
+/* Landing page — cyan/teal palette matching DarkGradientBg streaks */
+:root,
+[data-theme="dark"] {
+  --landing-accent: #00cfff;
+  --landing-accent-strong: #7de9ff;
+  --landing-accent-bg: rgba(0, 207, 255, 0.1);
+  --landing-accent-border: rgba(0, 207, 255, 0.26);
+  --landing-cta-bg: #0a6e7a;
+  --landing-cta-muted: rgba(210, 240, 245, 0.72);
+  --landing-cta-subtle: rgba(180, 220, 228, 0.42);
+  --landing-visual-base: #0f1419;
+  --landing-visual-gradient: radial-gradient(
+      circle at 20% 24%,
+      rgba(37, 99, 235, 0.58),
+      transparent 50%
+    ),
+    radial-gradient(circle at 80% 76%, rgba(99, 102, 241, 0.28), transparent 46%),
+    linear-gradient(145deg, #1e3a8a 0%, #0f1419 58%, #172554 100%);
+  --landing-card-shadow: 0 20px 56px rgba(0, 0, 0, 0.32);
+  --landing-card-shadow-sm: 0 14px 36px rgba(0, 0, 0, 0.2);
+  --landing-wordmark-solid: rgba(236, 250, 252, 0.96);
+  --landing-wordmark-shadow: rgba(0, 207, 255, 0.28);
+  --nav-logo-shadow: rgba(0, 207, 255, 0.22);
+}
+
+[data-theme="light"] {
+  --landing-accent: #0e7490;
+  --landing-accent-strong: #0891b2;
+  --landing-accent-bg: rgba(14, 116, 144, 0.08);
+  --landing-accent-border: rgba(14, 116, 144, 0.2);
+  --landing-cta-bg: #0e7490;
+  --landing-cta-muted: rgba(255, 255, 255, 0.76);
+  --landing-cta-subtle: rgba(255, 255, 255, 0.5);
+  --landing-visual-base: #0f172a;
+  --landing-visual-gradient: radial-gradient(
+      circle at 20% 24%,
+      rgba(37, 99, 235, 0.55),
+      transparent 50%
+    ),
+    radial-gradient(circle at 80% 76%, rgba(99, 102, 241, 0.25), transparent 46%),
+    linear-gradient(145deg, #1e3a8a 0%, #0f172a 58%, #172554 100%);
+  --landing-card-shadow: 0 18px 48px rgba(40, 35, 30, 0.09);
+  --landing-card-shadow-sm: 0 12px 32px rgba(40, 35, 30, 0.07);
+  --landing-wordmark-solid: #0f2930;
+  --landing-wordmark-shadow: rgba(14, 116, 144, 0.35);
+  --nav-logo-shadow: rgba(14, 116, 144, 0.22);
+}
+
+/* Landing page background only — cards keep default App.css surfaces */
+[data-theme="dark"] .landing-page {
+  --bg: #0f1112;
+}
+
+[data-theme="light"] .landing-page {
+  --bg: #e8e4dd;
+}
+
+/* Landing design system — shared surfaces */
+.landing-card {
+  overflow: hidden;
+  border-radius: var(--radius-landing);
+  border: 1px solid var(--surface-divider);
+  background: var(--surface);
+}
+
+.landing-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-landing-btn);
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease,
+    opacity 0.15s ease;
+}
+
+.landing-btn-primary {
+  border: 0;
+  background: var(--landing-cta-bg);
+  color: #fff;
+}
+
+.landing-btn-primary:hover {
+  background: color-mix(in srgb, var(--landing-cta-bg) 88%, var(--landing-accent) 12%);
+  opacity: 1;
+}
+
+.landing-btn-secondary {
+  border: 1px solid var(--surface-divider);
+  background: var(--surface);
+  color: var(--text);
+}
+
+.landing-btn-secondary:hover {
+  background: var(--surface-hover);
+}
+
+.bg-gradient-radial {
+  background-image: radial-gradient(
+    ellipse at center,
+    rgba(30, 41, 59, 0.2),
+    transparent 70%
+  );
+}
+
+.landing-dot-strip {
+  background-color: var(--surface);
+  background-image: radial-gradient(
+    circle at 1px 1px,
+    color-mix(in srgb, var(--text) 10%, transparent) 1px,
+    transparent 0
+  );
+  background-size: 14px 14px;
+}
+
+.landing-display {
+  font-family: var(--font-display);
+}
+
+.landing-nav-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+
+.landing-nav-body-visible {
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.hero-section-gradient {
+  opacity: 0.55;
+  mask-image: linear-gradient(to bottom, #000 0%, #000 72%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 72%, transparent 100%);
+}
+
+[data-theme="light"] .hero-section-gradient {
+  opacity: 0.62;
+  mix-blend-mode: multiply;
+}
+
+[data-theme="dark"] .hero-section-gradient {
+  opacity: 0.72;
+  mix-blend-mode: normal;
+}
+
+.theme-dashboard-dark {
+  display: none;
+}
+
+[data-theme="dark"] .theme-dashboard-light {
+  display: none;
+}
+
+[data-theme="dark"] .theme-dashboard-dark {
+  display: block;
+}
+
+.landing-nav-btn {
+  display: inline-grid;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 9999px;
+  border: 1px solid color-mix(in srgb, var(--text) 10%, transparent);
+  background: color-mix(in srgb, var(--bg) 88%, var(--surface) 12%);
+  color: var(--text);
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.landing-nav-btn:hover {
+  background: color-mix(in srgb, var(--surface-hover) 92%, var(--bg) 8%);
+  border-color: color-mix(in srgb, var(--text) 16%, transparent);
+}
+
+.controls-grid {
+  border-color: color-mix(in srgb, var(--text) 22%, transparent);
+}
+
+.controls-grid-row {
+  border-top: 1px solid color-mix(in srgb, var(--text) 22%, transparent);
+}
+
+.controls-grid-cell {
+  border-color: color-mix(in srgb, var(--text) 22%, transparent);
+}
+
+[data-theme="dark"] .controls-grid,
+[data-theme="dark"] .controls-grid-row,
+[data-theme="dark"] .controls-grid-cell {
+  border-color: color-mix(in srgb, var(--text) 28%, transparent);
 }

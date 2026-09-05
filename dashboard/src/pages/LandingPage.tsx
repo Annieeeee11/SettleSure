@@ -1,27 +1,27 @@
-import LandingCta from "@/components/landing/LandingCta";
-import LandingFaq from "@/components/landing/LandingFaq";
-import LandingFeatures from "@/components/landing/LandingFeatures";
-import LandingFooter from "@/components/landing/LandingFooter";
-import LandingHeader from "@/components/landing/LandingHeader";
-import LandingHero from "@/components/landing/LandingHero";
-import LandingPipeline from "@/components/landing/LandingPipeline";
-import LandingPreview from "@/components/landing/LandingPreview";
+import { useRef } from "react";
+import { ControlsSection, CtaSection } from "@/components/landing/redesign/ClosingSections";
+import DepthStory from "@/components/landing/redesign/DepthStory";
+import FaqSection from "@/components/landing/redesign/FaqSection";
+import Hero from "@/components/landing/redesign/Hero";
+import SocialSignals from "@/components/landing/redesign/SocialSignals";
+import StackingCardsParallax from "@/components/landing/redesign/StackingCardsParallax";
+import { useLandingAnimations } from "@/components/landing/redesign/useLandingAnimations";
 
 export default function LandingPage() {
+  const root = useRef<HTMLDivElement>(null);
+  useLandingAnimations(root);
+
   return (
-    <div className="min-h-screen select-text bg-[var(--bg)] text-[var(--text)]">
-      <LandingHeader />
-      <main className="flex flex-col gap-24 pb-8 lg:gap-32 lg:pb-10">
-        <div className="flex flex-col gap-8 lg:gap-10">
-          <LandingHero />
-          <LandingPreview />
-        </div>
-        <LandingPipeline />
-        <LandingFeatures />
-        <LandingFaq />
-        <LandingCta />
+    <div ref={root} id="top" className="landing-page min-h-screen bg-[var(--bg)] font-sans text-[var(--text)]">
+      <main>
+        <Hero />
+        <DepthStory />
+        <StackingCardsParallax />
+        <SocialSignals />
+        <ControlsSection />
+        <FaqSection />
+        <CtaSection />
       </main>
-      <LandingFooter />
     </div>
   );
 }

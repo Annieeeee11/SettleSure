@@ -19,34 +19,55 @@ const ROWS = [
   },
 ] as const;
 
-export default function DashboardExceptionsPreview() {
+export default function DashboardExceptionsPreview({ compact = false }: { compact?: boolean }) {
   return (
-    <div className="overflow-hidden rounded-2xl border border-[var(--card-border)] bg-[var(--surface)] shadow-[var(--shadow-raised-sm)]">
-      <div className="flex items-center justify-between border-b border-[var(--card-border)] px-4 py-3">
+    <div
+      className={`border border-[var(--card-border)] bg-[var(--surface)] shadow-[var(--shadow-raised-sm)] ${
+        compact ? "rounded-xl" : "overflow-hidden rounded-2xl"
+      }`}
+    >
+      <div
+        className={`flex items-center justify-between border-b border-[var(--card-border)] ${
+          compact ? "px-3 py-2" : "px-4 py-3"
+        }`}
+      >
         <div>
-          <p className="text-[0.6875rem] font-semibold tracking-tight">Exceptions</p>
-          <p className="text-[0.6875rem] text-[var(--text-tertiary)]">
+          <p className={`font-semibold tracking-tight ${compact ? "text-[10px]" : "text-[0.6875rem]"}`}>
+            Exceptions
+          </p>
+          <p className={`text-[var(--text-tertiary)] ${compact ? "text-[9px]" : "text-[0.6875rem]"}`}>
             Review queue · tier 5
           </p>
         </div>
-        <span className="font-mono text-[0.625rem] text-[var(--text-tertiary)]">
+        <span className={`font-mono text-[var(--text-tertiary)] ${compact ? "text-[9px]" : "text-[0.625rem]"}`}>
           3 pending
         </span>
       </div>
-      <div className="p-4">
+      <div className={compact ? "p-2.5" : "p-4"}>
         <section className="panel exceptions-panel !mb-0">
-          <div className="toolbar">
-            <span className="rounded-full bg-[var(--surface-inset)] px-3 py-1.5 text-[0.6875rem] text-[var(--text-secondary)] shadow-[var(--shadow-inset-sm)]">
+          <div className={`toolbar ${compact ? "!gap-2" : ""}`}>
+            <span
+              className={`rounded-full bg-[var(--surface-inset)] text-[var(--text-secondary)] shadow-[var(--shadow-inset-sm)] ${
+                compact ? "px-2 py-1 text-[9px]" : "px-3 py-1.5 text-[0.6875rem]"
+              }`}
+            >
               Filter: All
             </span>
-            <span className="rounded-full bg-[var(--surface-inset)] px-3 py-1.5 text-[0.6875rem] text-[var(--text-secondary)] shadow-[var(--shadow-inset-sm)]">
+            <span
+              className={`rounded-full bg-[var(--surface-inset)] text-[var(--text-secondary)] shadow-[var(--shadow-inset-sm)] ${
+                compact ? "px-2 py-1 text-[9px]" : "px-3 py-1.5 text-[0.6875rem]"
+              }`}
+            >
               Sort: Source
             </span>
           </div>
-          <div className="data-table">
-            <div className="data-table-scroll">
-              <div className="data-table-page">
-                <table>
+          <div
+            className={`data-table ${
+              compact ? "!overflow-visible [&_td]:py-1.5 [&_th]:py-1.5 [&_table]:text-[10px]" : ""
+            }`}
+          >
+            <div className="data-table-page">
+              <table>
                   <thead>
                     <tr>
                       <th scope="col" className="data-table-sno">
@@ -77,7 +98,6 @@ export default function DashboardExceptionsPreview() {
                     ))}
                   </tbody>
                 </table>
-              </div>
             </div>
           </div>
         </section>

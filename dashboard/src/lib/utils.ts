@@ -1,3 +1,7 @@
+export function cn(...parts: Array<string | false | null | undefined>): string {
+  return parts.filter(Boolean).join(" ");
+}
+
 export function friendlyError(message: string): string {
   if (message === "Failed to fetch") {
     return "The dashboard couldn't reach report.json. Start the dev server and generate a report first.";

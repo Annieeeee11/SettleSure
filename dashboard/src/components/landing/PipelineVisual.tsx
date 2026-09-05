@@ -5,16 +5,18 @@ import {
   TerminalBox,
   TerminalChrome,
   terminalBodyClass,
+  terminalBodyCompactClass,
 } from "./TerminalUi";
 
-function DeterministicVisual() {
+function DeterministicVisual({ compact = false }: { compact?: boolean }) {
   const d = CLI_PREVIEW;
   const s = d.matchSources;
+  const bodyClass = compact ? terminalBodyCompactClass : terminalBodyClass;
 
   return (
-    <TerminalChrome>
-      <div className={terminalBodyClass}>
-        <p className="mb-4 text-zinc-600">
+    <TerminalChrome compact={compact}>
+      <div className={bodyClass}>
+        <p className={compact ? "mb-2 text-zinc-600" : "mb-4 text-zinc-600"}>
           {"  status  "}
           <span className="font-semibold text-zinc-300">seed {d.status.seed}</span>
           {" · "}
@@ -23,7 +25,7 @@ function DeterministicVisual() {
           <span className="text-amber-400">{d.status.llm}</span>
         </p>
 
-        <TerminalBox title="match sources">
+        <TerminalBox title="match sources" compact={compact}>
           <p>
             <span className="text-cyan-400">Exact</span> {s.exact}
             {"  ·  "}
@@ -42,14 +44,16 @@ function DeterministicVisual() {
           </p>
         </TerminalBox>
 
-        <TerminalBox title="by difficulty">
+        <TerminalBox title="by difficulty" compact={compact}>
           {d.difficulty.map((row) => (
             <p key={row.label}>
-              <span className="inline-block w-28 text-zinc-300">{row.label}</span>
-              <span className="inline-block w-24">
+              <span className={`inline-block text-zinc-300 ${compact ? "w-24" : "w-28"}`}>
+                {row.label}
+              </span>
+              <span className={`inline-block ${compact ? "w-20" : "w-24"}`}>
                 match {row.match.padStart(7)}
               </span>
-              <span className="inline-block w-24">
+              <span className={`inline-block ${compact ? "w-20" : "w-24"}`}>
                 prec {row.prec.padStart(7)}
               </span>
               deferred {row.deferred.padStart(7)}
@@ -67,16 +71,17 @@ function DeterministicVisual() {
   );
 }
 
-function LlmVisual() {
+function LlmVisual({ compact = false }: { compact?: boolean }) {
   const d = CLI_PREVIEW;
   const deferred = d.exceptions.preview.filter((ex) =>
     ex.reason.includes("ambiguous"),
   );
+  const bodyClass = compact ? terminalBodyCompactClass : terminalBodyClass;
 
   return (
-    <TerminalChrome>
-      <div className={terminalBodyClass}>
-        <TerminalBox title="release gate · tier 4">
+    <TerminalChrome compact={compact}>
+      <div className={bodyClass}>
+        <TerminalBox title="release gate · tier 4" compact={compact}>
           <p className="text-amber-400">LLM corroboration required · deferred</p>
           <p className="text-zinc-600">
             wrong verdicts cannot auto-release without corroboration
@@ -85,17 +90,22 @@ function LlmVisual() {
 
         <TerminalBox
           title={`exceptions (${d.exceptions.groups} groups / ${d.exceptions.records} records)`}
+          compact={compact}
         >
           {deferred.map((ex) => (
             <p key={ex.ids} className="flex gap-2">
-              <span className="w-40 shrink-0 truncate text-cyan-400">{ex.ids}</span>
-              <span className="w-28 shrink-0 text-zinc-600">{ex.source}</span>
+              <span className={`shrink-0 truncate text-cyan-400 ${compact ? "w-32" : "w-40"}`}>
+                {ex.ids}
+              </span>
+              <span className={`shrink-0 text-zinc-600 ${compact ? "w-24" : "w-28"}`}>
+                {ex.source}
+              </span>
               <span className="min-w-0 text-zinc-500">{ex.reason}</span>
             </p>
           ))}
         </TerminalBox>
 
-        <p className="mt-2 text-zinc-600">
+        <p className={compact ? "mt-1 text-zinc-600" : "mt-2 text-zinc-600"}>
           {"  limitations  "}
           {d.limitations}
         </p>
@@ -109,13 +119,14 @@ function LlmVisual() {
   );
 }
 
-const VISUALS: Record<PipelineVisualKind, () => React.JSX.Element> = {
-  deterministic: DeterministicVisual,
-  llm: LlmVisual,
-  human: () => <DashboardExceptionsPreview />,
-};
-
-export default function PipelineVisual({ kind }: { kind: PipelineVisualKind }) {
-  const Visual = VISUALS[kind];
-  return <Visual />;
+export default function PipelineVisual({
+  kind,
+  compact = false,
+}: {
+  kind: PipelineVisualKind;
+  compact?: boolean;
+}) {
+  if (kind === "deterministic") return <DeterministicVisual compact={compact} />;
+  if (kind === "llm") return <LlmVisual compact={compact} />;
+  return <DashboardExceptionsPreview compact={compact} />;
 }

@@ -14,8 +14,8 @@ export default function CornerActions({ layout = "fixed" }: Props) {
           : "flex items-center gap-2"
       }
     >
-      <GitHubStar />
-      <ThemeToggle />
+      <GitHubStar className="landing-nav-btn" />
+      <ThemeToggle className="landing-nav-btn" />
     </div>
   );
 }
