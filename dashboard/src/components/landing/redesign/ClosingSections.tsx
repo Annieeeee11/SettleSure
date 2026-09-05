@@ -60,13 +60,15 @@ export function ControlsSection() {
           </div>
 
           <div className="controls-grid-cell border-t bg-[var(--surface-inset)] p-6 md:border-t-0 md:border-l md:p-8 lg:p-10">
-            <div className="flex h-full min-h-[280px] items-center justify-center overflow-hidden rounded-landing-btn bg-[var(--surface)] p-4 md:min-h-[360px]">
-              <img
-                src="/settlesure-architecture.png"
-                alt="SettleSure reconciliation architecture"
-                className="h-full w-full rounded-[6px] object-cover object-top shadow-[var(--landing-card-shadow-sm)]"
-              />
-            </div>
+            <DarkGradientBg className="h-full min-h-[280px] rounded-landing-btn md:min-h-[360px]">
+              <div className="flex h-full min-h-[280px] items-center justify-center p-4 md:min-h-[360px]">
+                <img
+                  src="/settlesure-architecture.png"
+                  alt="SettleSure reconciliation architecture"
+                  className="h-full w-full rounded-[6px] object-cover object-top shadow-[var(--landing-card-shadow-sm)]"
+                />
+              </div>
+            </DarkGradientBg>
           </div>
         </div>
 

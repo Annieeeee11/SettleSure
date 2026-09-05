@@ -5,19 +5,17 @@ import { repositoryUrl } from "./content";
 
 export default function Hero() {
   return (
-    <section className="relative pb-12 pt-3 max-[700px]:pb-10 max-[700px]:pt-2">
+    <section className="relative pb-10 pt-3 max-[700px]:pb-8 max-[700px]:pt-2">
       <DarkGradientBg
         aria-hidden
         className="hero-section-gradient pointer-events-none absolute inset-0 z-0"
       />
       <Header />
       <div className="relative z-10 mx-auto max-w-[1180px] px-[max(24px,6vw)] max-[700px]:px-4">
-        <div className="mx-auto max-w-[880px] pt-14 text-center max-[700px]:pt-10">
+        <div className="mx-auto max-w-[880px] pt-24 text-center max-[700px]:pt-16">
           <h1 className="sc-hero-title landing-display text-balance text-[clamp(48px,6.4vw,88px)] font-normal leading-[0.92] tracking-[-0.065em] text-[var(--text)]">
-            <span className="block">Three exports in.</span>
-            <span className="block text-[color-mix(in_srgb,var(--text)_88%,var(--text-secondary))]">
-              One audit-ready close.
-            </span>
+            <span className="block text-[var(--text)]">Three exports in.</span>
+            <span className="block text-[var(--text)]">One audit-ready close.</span>
           </h1>
           <div className="sc-reveal mt-10 flex flex-wrap items-center justify-center gap-3">
             <button
