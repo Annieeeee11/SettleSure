@@ -168,7 +168,7 @@ export default function StackingCardsParallax() {
 
   return (
     <section id="workflow" className="landing-section">
-      <div className="mx-auto max-w-[1180px] px-[max(24px,6vw)] pt-[110px] max-[900px]:px-5 max-[900px]:pt-16">
+      <div className="mx-auto max-w-[1180px] px-[max(24px,6vw)] pt-12 max-[900px]:px-5 max-[900px]:pt-10">
         <div className="sc-reveal mb-14 max-w-[720px] max-[900px]:mb-10">
           <span className="font-mono text-[11px] tracking-[.14em] text-[var(--landing-accent)]">
             THE SETTLESURE CONTROL LOOP

@@ -10,7 +10,7 @@ const actionClass =
 function StackScene() {
   return (
     <div
-      className="sc-stack absolute aspect-[1.62] w-[clamp(520px,60vw,760px)] opacity-0 [perspective:1100px] [transform-style:preserve-3d] will-change-transform max-[700px]:w-[500px]"
+      className="sc-stack absolute aspect-[1.62] w-[clamp(440px,52vw,640px)] opacity-0 [perspective:1100px] [transform-style:preserve-3d] will-change-transform max-[700px]:w-[420px]"
       aria-hidden="true"
     >
       <div className={`sc-stack-layer sc-layer-1 ${layerClass}`}>
@@ -105,9 +105,9 @@ export default function DepthStory() {
   return (
     <section
       id="platform"
-      className="sc-story landing-section relative h-[440vh] overflow-x-clip max-[700px]:h-[390vh]"
+      className="sc-story landing-section relative h-[360vh] overflow-x-clip max-[700px]:h-[330vh]"
     >
-      <div className="sticky top-0 flex h-screen min-h-[720px] items-center justify-center overflow-hidden [perspective:1200px]">
+      <div className="sticky top-0 flex h-screen min-h-[620px] items-center justify-center overflow-hidden [perspective:1200px]">
         <StackScene />
         <div
           className={`sc-story-intro ${copyClass} top-[72%] w-[520px] text-center max-[700px]:top-[69%] max-[700px]:w-full`}
