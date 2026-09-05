@@ -16,6 +16,10 @@ import MatchSourceSection from "../sections/MatchSourceSection";
 import MetricsSection from "../sections/MetricsSection";
 import type { DashboardTab } from "../lib/constants";
 import type { Exception, FullReport, MatchResult } from "../types";
+import {
+  NavBody,
+  Navbar,
+} from "../components/landing/redesign/ResizableNavbar";
 
 interface Props {
   report: FullReport;
@@ -28,7 +32,7 @@ export default function DashboardPage({
   reportMode,
   onReportComplete,
 }: Props) {
-  const [tab, setTab] = useState<DashboardTab>("exceptions");
+  const [tab, setTab] = useState<DashboardTab>("matches");
   const [filter, setFilter] = useState("all");
   const [selectedException, setSelectedException] = useState<Exception | null>(
     null,
@@ -100,9 +104,15 @@ export default function DashboardPage({
 
   return (
     <>
-      <BackToLanding />
+      <header className="h-13" aria-label="Dashboard navigation">
+        <Navbar>
+          <NavBody className="dashboard-nav-body">
+          <BackToLanding layout="inline" />
+          <CornerActions layout="inline" />
+          </NavBody>
+        </Navbar>
+      </header>
       <div className="shell">
-      <CornerActions />
       <HeroSection report={report} reportMode={reportMode} />
 
       <ReconcilePanel

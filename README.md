@@ -12,7 +12,7 @@ Built for [Razorpay AI Buildathon 2026, Track 04: AI Finance Controller](https:/
 
 | CLI reconcile | Dashboard metrics |
 | --- | --- |
-| ![CLI reconcile output](docs/cli.png) | ![Dashboard metrics](docs/dashboard-seed42.png) |
+| ![CLI reconcile output](docs/cli.png) | <picture><source media="(prefers-color-scheme: dark)" srcset="dashboard/public/ness/dashboad-dak2.png"><img src="dashboard/public/ness/dashboad-light.png" alt="Dashboard metrics"></picture> |
 
 ## Reconciliation loop
 

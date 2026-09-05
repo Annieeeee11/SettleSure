@@ -5,9 +5,13 @@ export function isDashboardRoute(pathname: string) {
 }
 
 export function goToDashboard() {
-  if (window.location.pathname === "/dashboard") return;
+  if (window.location.pathname === "/dashboard") {
+    window.scrollTo(0, 0);
+    return;
+  }
   window.history.pushState(null, "", "/dashboard");
   window.dispatchEvent(new PopStateEvent("popstate"));
+  window.scrollTo(0, 0);
 }
 
 export function goToLanding() {

@@ -17,15 +17,11 @@ function DashboardApp() {
     retry,
   } = useReport();
 
-  if (error) {
-    return <ErrorPage error={error} onRetry={retry} />;
-  }
-
-  if (!report) {
-    return <LoadingPage />;
-  }
-
-  return (
+  const content = error ? (
+    <ErrorPage error={error} onRetry={retry} />
+  ) : !report ? (
+    <LoadingPage />
+  ) : (
     <DashboardPage
       report={report}
       reportMode={reportMode}
@@ -36,6 +32,8 @@ function DashboardApp() {
       }}
     />
   );
+
+  return <div className="dashboard-page">{content}</div>;
 }
 
 export default function App() {

@@ -1,7 +1,8 @@
 import { motion } from "framer-motion";
+import SettleSureWordmark from "@/components/SettleSureWordmark";
 import CornerActions from "@/components/CornerActions";
 import { goToDashboard } from "@/hooks/useRoute";
-import { LOGO, NAV_LINKS } from "@/lib/landingContent";
+import { NAV_LINKS } from "@/lib/landingContent";
 import { SPRING_IN } from "./landingMotion";
 
 export default function LandingHeader() {
@@ -12,12 +13,8 @@ export default function LandingHeader() {
       animate={{ opacity: 1, y: 0 }}
       transition={SPRING_IN}
     >
-      <a className="inline-flex items-center" href="/" aria-label={LOGO.alt}>
-        <img
-          src={LOGO.src}
-          alt={LOGO.alt}
-          className="h-8 w-auto object-contain object-left"
-        />
+      <a className="inline-flex items-center" href="/" aria-label="SettleSure home">
+        <SettleSureWordmark variant="dark" size="sm" />
       </a>
       <nav
         className="hidden items-center justify-center gap-6 md:flex"

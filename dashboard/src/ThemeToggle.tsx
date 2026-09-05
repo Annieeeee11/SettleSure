@@ -80,7 +80,7 @@ function animateThemeReveal(button: HTMLButtonElement) {
   );
 }
 
-export default function ThemeToggle() {
+export default function ThemeToggle({ className = "theme-toggle" }: { className?: string }) {
   const ref = useRef<HTMLButtonElement>(null);
   const [theme, setTheme] = useState<Theme>(() => getStoredTheme());
 
@@ -90,7 +90,7 @@ export default function ThemeToggle() {
     if (meta) {
       meta.setAttribute(
         "content",
-        theme === "light" ? "#f4f2ee" : "#1a1a1e",
+        theme === "light" ? "#e8e4dd" : "#0f1112",
       );
     }
   }, [theme]);
@@ -137,7 +137,7 @@ export default function ThemeToggle() {
     <button
       ref={ref}
       type="button"
-      className="theme-toggle"
+      className={className}
       onClick={toggle}
       aria-label={
         theme === "dark" ? "Switch to light mode" : "Switch to dark mode"

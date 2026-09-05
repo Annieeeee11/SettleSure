@@ -24,12 +24,12 @@ function StarIcon() {
   );
 }
 
-export default function GitHubStar() {
+export default function GitHubStar({ className = "github-star" }: { className?: string }) {
   return (
     <Tooltip>
       <TooltipTrigger asChild>
         <a
-          className="github-star"
+          className={className}
           href={REPO_URL}
           target="_blank"
           rel="noopener noreferrer"

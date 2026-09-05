@@ -2,7 +2,6 @@ export const REPO_URL = "https://github.com/Annieeeee11/SettleSure";
 export const CLI_CMD = "cargo run -p settlesure-cli -- --seed 42 --skip-llm";
 
 export const LOGO = {
-  src: "/settlesure-logo.png",
   alt: "SettleSure",
 } as const;
 
