@@ -106,7 +106,7 @@ export default function DashboardPage({
     <>
       <header className="h-13" aria-label="Dashboard navigation">
         <Navbar>
-          <NavBody>
+          <NavBody className="dashboard-nav-body">
           <BackToLanding layout="inline" />
           <CornerActions layout="inline" />
           </NavBody>

@@ -42,7 +42,7 @@ export default function Hero() {
         <div className="sc-hero-media mx-auto mt-16 grid max-w-[1180px] grid-cols-2 gap-3 max-[700px]:mt-12 max-[700px]:grid-cols-1">
           <ProductCard
             image="/ness/dashboad-light.png"
-            darkImage="/ness/dashboad-dak.png"
+            darkImage="/ness/dashboad-dak2.png"
             alt="SettleSure dashboard with benchmark metrics and exception queue"
           />
           <ProductCard

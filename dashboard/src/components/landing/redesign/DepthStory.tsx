@@ -65,7 +65,7 @@ function StackScene() {
         />
         <img
           className="theme-dashboard-dark sc-stack-media sc-stack-dashboard absolute inset-0 h-full w-full object-cover object-left-top opacity-0 [filter:saturate(.72)_brightness(.68)]"
-          src="/ness/dashboad-dak.png"
+          src="/ness/dashboad-dak2.png"
           alt=""
         />
       </div>
@@ -94,9 +94,6 @@ function StackScene() {
           alt=""
         />
       </div>
-      <span className="absolute left-[55px] top-[18px] font-mono text-[8px] text-neutral-500">0011</span>
-      <span className="absolute right-[45px] top-1/2 font-mono text-[8px] text-neutral-500">01001</span>
-      <span className="absolute bottom-[35px] left-[35%] font-mono text-[8px] text-neutral-500">011</span>
     </div>
   );
 }
@@ -118,7 +115,7 @@ export default function DepthStory() {
           </p>
         </div>
         <div
-          className={`sc-story-app ${copyClass} left-[8%] top-[42%] text-left max-[700px]:inset-x-6 max-[700px]:top-[70%] max-[700px]:text-center`}
+          className={`sc-story-app ${copyClass} left-[12%] top-[42%] text-left max-[700px]:inset-x-6 max-[700px]:top-[70%] max-[700px]:text-center`}
         >
           <span className="mb-6 block font-mono text-[10px] text-[var(--text-tertiary)]">◢ WORKFLOW</span>
           <h2 className="mb-3 text-[28px] font-normal tracking-[-.03em]">
@@ -135,7 +132,7 @@ export default function DepthStory() {
           </button>
         </div>
         <div
-          className={`sc-story-data ${copyClass} right-[7%] top-[42%] text-left max-[700px]:inset-x-6 max-[700px]:top-[70%] max-[700px]:text-center`}
+          className={`sc-story-data ${copyClass} right-[11%] top-[42%] text-left max-[700px]:inset-x-6 max-[700px]:top-[70%] max-[700px]:text-center`}
         >
           <span className="mb-6 block font-mono text-[10px] text-[var(--text-tertiary)]">◢ REVIEW</span>
           <h2 className="mb-3 text-[28px] font-normal tracking-[-.03em]">

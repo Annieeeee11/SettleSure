@@ -73,6 +73,14 @@ export function DarkGradientBg({ children, className }: DarkGradientBgProps) {
       </div>
 
       <div
+        className="absolute inset-0"
+        style={{
+          background:
+            "radial-gradient(75% 70% at 100% 100%, rgba(0, 112, 96, 0.5) 0%, rgba(0, 72, 66, 0.24) 38%, rgba(0, 0, 0, 0) 72%)",
+        }}
+      />
+
+      <div
         className="absolute inset-0 bg-repeat opacity-5"
         style={{
           backgroundImage:

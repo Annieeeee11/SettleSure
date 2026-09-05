@@ -2474,12 +2474,12 @@ code {
 
 [data-theme="dark"] .dashboard-page {
   --bg: #000000;
-  --bg-elevated: #171717;
-  --surface: #171717;
-  --surface-inset: #111111;
-  --surface-inset-deep: #0b0b0b;
-  --glass: #171717;
-  --glass-hover: #202020;
+  --bg-elevated: #232328;
+  --surface: #232328;
+  --surface-inset: #232328;
+  --surface-inset-deep: #232328;
+  --glass: #232328;
+  --glass-hover: #29292f;
   --text: rgba(255, 255, 255, 0.84);
   --text-secondary: rgba(255, 255, 255, 0.55);
   --text-tertiary: rgba(255, 255, 255, 0.35);
@@ -2491,8 +2491,8 @@ code {
   --foot-divider: rgba(255, 255, 255, 0.14);
   --wm-solid: rgba(255, 255, 255, 0.84);
   --wm-shadow: rgba(0, 207, 255, 0.28);
-  --card-surface: #191919;
-  --card-border: #2b2b2b;
+  --card-surface: #232328;
+  --card-border: rgba(255, 255, 255, 0.1);
   --card-text: rgba(255, 255, 255, 0.84);
   --card-muted: rgba(255, 255, 255, 0.45);
   --shadow-raised: 0 18px 48px rgba(0, 0, 0, 0.24);
@@ -2712,6 +2712,28 @@ code {
   order: -1;
   background: transparent;
   border: 1px solid var(--surface-divider);
+}
+
+.dashboard-page .back-to-landing-inline,
+.dashboard-page .landing-nav-btn {
+  background: transparent;
+  color: var(--text);
+}
+
+.dashboard-page .back-to-landing-inline:hover,
+.dashboard-page .landing-nav-btn:hover {
+  background: var(--surface-hover);
+}
+
+[data-theme="dark"] .dashboard-page .landing-nav-btn {
+  background: #232328;
+}
+
+.dashboard-page .back-to-landing-inline,
+[data-theme="dark"] .dashboard-page .back-to-landing-inline {
+  background: var(--landing-cta-bg);
+  border-color: var(--landing-cta-bg);
+  color: #fff;
 }
 
 .dashboard-page .difficulty-grid {
